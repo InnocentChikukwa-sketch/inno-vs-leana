@@ -129,6 +129,19 @@ textarea::placeholder,input::placeholder{color:var(--muted)}
 .net.bad{background:#5a1f17}
 .hint{font-size:14px}
 .you{font-size:12px;color:var(--muted);font-family:var(--body);font-weight:600}
+/* pop-up alerts */
+.toast{position:fixed;left:50%;top:max(10px,env(safe-area-inset-top,0px));transform:translate(-50%,-150%);width:min(488px,calc(100% - 32px));
+  background:var(--card);color:var(--ink);border-radius:16px;padding:12px 14px;box-shadow:0 14px 34px -10px rgba(0,0,0,.75);z-index:50;
+  transition:transform .28s ease;display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.toast.show{transform:translate(-50%,0)}
+.toast .ic{font-size:20px;line-height:1.2}
+.toast b{display:block;font-family:var(--display);font-size:16px}
+.toast .tx{font-size:14px;color:#4a3f50;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.nbar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--felt);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
+.nbar .btn{padding:8px 12px;font-size:14px;background:var(--gold);color:#3a2a00;flex:none}
+.nbar .link{flex:none}
+.msg .tick{margin-left:6px}
+.msg .tick.ok{color:#2f8f62;opacity:1;font-weight:700}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0}
 </style>
@@ -180,21 +193,40 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){return null}}
 function loadJSON(k){try{return JSON.parse(store(k)||"null")}catch(e){return null}}
 
+/* ---------- shared clock: both phones use the website's server time, so messages sort the same way on both ---------- */
+let clockOff=Number(store("tod.clockoff"))||0;
+const now=()=>Date.now()+clockOff;
+async function syncClock(){
+  if(!/^https?:$/.test(location.protocol)) return;
+  try{
+    const t0=Date.now();
+    const r=await fetch(location.pathname+"?clock="+t0,{method:"HEAD",cache:"no-store"});
+    const t1=Date.now(), d=Date.parse(r.headers.get("date")||"");
+    if(!isNaN(d)&&t1-t0<4000){
+      const off=Math.round(d+500-(t0+t1)/2); // Date header is whole seconds
+      if(Math.abs(off)<86400000){ clockOff=off; store("tod.clockoff",String(off)); }
+    }
+  }catch(e){}
+}
+
 let me=store("tod.me");
 let tab="game", flash="", draft={}, confirmEnd=false, spinning=false, renderedKey=null;
-let unread=0, lastSeenChat=Number(store("tod.seen")||0);
+let unread=0, lastSeenChat=Number(store("tod.seen")||0), hiddenNew=0;
 const fresh=()=>({gameId:"g"+uid(),v:0,ts:0,round:1,phase:"toss",asker:null,choice:null,question:"",answer:"",chicken:false,
   scores:{inno:0,leana:0},last:null,rounds:[]});
 let state=loadJSON("tod.state")||fresh();
 let chat=loadJSON("tod.chat")||[];
+chat.sort((a,b)=>(a.ts-b.ts)||(a.id<b.id?-1:1));
 const lastSeen={inno:0,leana:0}, typingUntil={inno:0,leana:0};
 let clients=[], connected=0, everConnected=false;
+// delivery receipts: ids of my messages the other phone has confirmed
+let delivered=new Set(loadJSON("tod.delivered")||[]);
+let lastNotify=Number(store("tod.notified"))||chat.reduce((x,m)=>Math.max(x,m.ts||0),0);
 
 /* ---------- transport: two public relays, every message sent to both ---------- */
-const seenEvents=new Set();
-function publish(sub,obj,retain){
+function publish(sub,obj,retain,qos){
   const payload=JSON.stringify(obj);
-  clients.forEach(c=>{ try{ c.publish(BASE+sub,payload,{qos:0,retain:!!retain}); }catch(e){} });
+  clients.forEach(c=>{ try{ c.publish(BASE+sub,payload,{qos:qos==null?1:qos,retain:!!retain}); }catch(e){} });
 }
 function newer(a,b){ // is a newer than b?
   if(!b) return true;
@@ -203,10 +235,54 @@ function newer(a,b){ // is a newer than b?
   return String(a.by||"")>String(b.by||"");
 }
 function mergeChat(list){
-  let changed=false; const ids=new Set(chat.map(m=>m.id));
-  (list||[]).forEach(m=>{ if(m&&m.id&&!ids.has(m.id)&&typeof m.text==="string"&&(m.who==="inno"||m.who==="leana")){ chat.push({id:m.id,who:m.who,text:String(m.text).slice(0,2000),ts:Number(m.ts)||Date.now()}); ids.add(m.id); changed=true; if(m.who!==me&&tab!=="chat"&&(Number(m.ts)||0)>lastSeenChat) unread++; } });
-  if(changed){ chat.sort((a,b)=>a.ts-b.ts); if(chat.length>150) chat=chat.slice(-150); store("tod.chat",JSON.stringify(chat)); }
+  let changed=false; const ids=new Set(chat.map(m=>m.id)); const incoming=[];
+  (list||[]).forEach(m=>{ if(m&&m.id&&!ids.has(m.id)&&typeof m.text==="string"&&(m.who==="inno"||m.who==="leana")){
+    const msg={id:String(m.id),who:m.who,text:String(m.text).slice(0,2000),ts:Number(m.ts)||now()};
+    chat.push(msg); ids.add(msg.id); changed=true;
+    if(me&&m.who!==me){
+      if(tab!=="chat"&&msg.ts>lastSeenChat) unread++;
+      if(msg.ts>lastNotify) incoming.push(msg);
+    } } });
+  if(changed){ chat.sort((a,b)=>(a.ts-b.ts)||(a.id<b.id?-1:1)); if(chat.length>150) chat=chat.slice(-150); store("tod.chat",JSON.stringify(chat)); }
+  if(incoming.length){
+    lastNotify=Math.max(lastNotify,...incoming.map(m=>m.ts)); store("tod.notified",String(lastNotify));
+    const l=incoming[incoming.length-1], who=NAMES[l.who];
+    alertUser("chat", incoming.length>1?`${who} · ${incoming.length} new messages`:who, l.text, "chat");
+  }
   return changed;
+}
+// tell the sender which of their messages reached this phone
+function ackFrom(list){
+  if(!me) return;
+  const ids=(list||[]).filter(m=>m&&m.id&&m.who===other(me)).map(m=>String(m.id)).slice(-100);
+  if(ids.length) publish("ack",{who:me,cid:myCid,ids},false,1);
+}
+// re-send my messages until the other phone confirms them
+function pendingMine(){ return me?chat.filter(m=>m.who===me&&!delivered.has(m.id)).slice(-20):[]; }
+function resendPending(){
+  if(!connected) return;
+  const p=pendingMine(); if(!p.length) return;
+  p.forEach(m=>publish("msg",m,false,1));
+}
+setInterval(resendPending,5000);
+let syncT=null;
+function chatSyncIfBehind(list){
+  // if the relay's saved chat is missing messages this phone has, put the full list back
+  const ids=new Set((list||[]).map(m=>m&&String(m.id)));
+  const minTs=(list&&list.length)?Math.min(...list.map(m=>Number(m&&m.ts)||0)):-Infinity;
+  if(chat.slice(-100).some(m=>m.ts>=minTs&&!ids.has(m.id))){
+    clearTimeout(syncT); syncT=setTimeout(()=>publish("chat",{list:chat.slice(-100)},true,1),600+Math.random()*1400);
+  }
+}
+function turnAlert(s){
+  if(!me) return null;
+  const a=s.asker, o=a?other(a):null, A=NAMES[a]||"", O=NAMES[o]||"";
+  if(s.phase==="choose"&&me===o) return [`Your turn, ${NAMES[me]}`,`${A} is asking. Truth or dare?`];
+  if(s.phase==="ask"&&me===a) return [`${O} picked ${s.choice}`,`Write your ${s.choice} for ${O}.`];
+  if(s.phase==="answer"&&me===o) return [`New ${s.choice} from ${A}`,s.question||""];
+  if(s.phase==="react"&&me===a) return [`${O} answered`,s.chicken?`${O} chickened out 🐔`:(s.answer||"Done it ✔")];
+  if(s.phase==="over") return ["Game over",`${s.scores.inno} – ${s.scores.leana}. See who won.`];
+  return null;
 }
 function onMessage(topic,buf,packet){
   const sub=topic.slice(BASE.length); let d;
@@ -216,18 +292,30 @@ function onMessage(topic,buf,packet){
     if(d.gameId&&d.scores&&newer(d,state)){
       const prev=state; state=d; if(!Array.isArray(state.rounds)) state.rounds=[];
       store("tod.state",JSON.stringify(state));
-      if(prev.phase!==state.phase||prev.round!==state.round){ flash=""; confirmEnd=false; }
+      if(prev.phase!==state.phase||prev.round!==state.round){
+        flash=""; confirmEnd=false;
+        if(d.by&&d.by!==me&&!packet.retain){ const t=turnAlert(state); if(t) alertUser("game",t[0],t[1],"game"); }
+      }
       render();
     }
   } else if(sub==="chat"){
-    if(mergeChat(d.list)) render();
+    const list=Array.isArray(d.list)?d.list:[];
+    if(mergeChat(list)) render();
+    ackFrom(list); chatSyncIfBehind(list);
   } else if(sub==="msg"){
     if(mergeChat([d])) render();
+    ackFrom([d]);
+  } else if(sub==="ack"){
+    if(me&&d.who===other(me)&&Array.isArray(d.ids)){
+      let ch=false; const mine=new Set(chat.filter(m=>m.who===me).map(m=>m.id));
+      d.ids.forEach(id=>{ id=String(id); if(mine.has(id)&&!delivered.has(id)){ delivered.add(id); ch=true; } });
+      if(ch){ delivered=new Set([...delivered].slice(-300)); store("tod.delivered",JSON.stringify([...delivered])); lastSeen[d.who]=Date.now(); render(); }
+    }
   } else if(sub==="hb"||sub==="hello"){
     if(d.who==="inno"||d.who==="leana"){
       if(d.cid===myCid) return;
       if(!packet.retain) lastSeen[d.who]=Date.now();
-      if(sub==="hello"&&me) heartbeat();
+      if(sub==="hello"&&me){ heartbeat(); if(chat.length) publish("chat",{list:chat.slice(-100)},true,1); resendPending(); }
       render();
     }
   } else if(sub==="typing"){
@@ -247,8 +335,9 @@ function connect(){
       c.subscribe(BASE+"#",{qos:0},()=>{
         if(me){ c.publish(BASE+"hello",JSON.stringify({who:me,cid:myCid}),{qos:0}); }
         // make sure this relay holds the newest game and chat we know
-        if(state.v>0) c.publish(BASE+"state",JSON.stringify(state),{qos:0,retain:true});
-        if(chat.length) c.publish(BASE+"chat",JSON.stringify({list:chat.slice(-100)}),{qos:0,retain:true});
+        if(state.v>0) c.publish(BASE+"state",JSON.stringify(state),{qos:1,retain:true});
+        if(chat.length) c.publish(BASE+"chat",JSON.stringify({list:chat.slice(-100)}),{qos:1,retain:true});
+        setTimeout(resendPending,800);
       });
     });
     c.on("close",()=>{ c._up=false; recount(); });
@@ -259,7 +348,54 @@ function connect(){
   });
 }
 function recount(){ const n=clients.filter(c=>c._up).length; if(n!==connected){ connected=n; render(); } }
-function heartbeat(){ if(me) publish("hb",{who:me,cid:myCid}); }
+function heartbeat(){ if(me) publish("hb",{who:me,cid:myCid},false,0); }
+
+/* ---------- alerts: pop-up inside the game, beep and buzz, and a phone notification when the game is in the background ---------- */
+const toastEl=document.createElement("div"); toastEl.className="toast"; toastEl.setAttribute("role","status"); toastEl.setAttribute("aria-live","polite");
+document.body.appendChild(toastEl);
+let toastT=null, toastTab=null;
+toastEl.addEventListener("click",()=>{ toastEl.classList.remove("show"); if(toastTab&&me){ openTab(toastTab); } });
+function toast(title,body,goTab,icon){
+  toastTab=goTab;
+  toastEl.innerHTML=`<span class="ic">${icon}</span><div><b>${esc(title)}</b><span class="tx">${esc(body)}</span></div>`;
+  toastEl.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove("show"),4500);
+}
+let actx=null;
+function unlockAudio(){ if(actx){ if(actx.state==="suspended") actx.resume().catch(()=>{}); return; } try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+function beep(){
+  if(!actx) return;
+  try{ if(actx.state==="suspended") actx.resume();
+    const t=actx.currentTime, o=actx.createOscillator(), g=actx.createGain();
+    o.type="sine"; o.frequency.setValueAtTime(880,t); o.frequency.setValueAtTime(1175,t+.12);
+    g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.18,t+.02); g.gain.exponentialRampToValueAtTime(.0001,t+.32);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+.35);
+  }catch(e){}
+}
+const canNotify=()=>"Notification" in window && "serviceWorker" in navigator && location.protocol==="https:";
+let swReg=null;
+function systemNote(title,body,goTab,kind){
+  if(!canNotify()||Notification.permission!=="granted") return;
+  const opts={body:String(body||"").slice(0,180),tag:"tod-"+kind,renotify:true,vibrate:[150,80,150],data:{tab:goTab}};
+  if(swReg) swReg.showNotification(title,opts).catch(()=>{});
+  else { try{ new Notification(title,opts); }catch(e){} }
+}
+const baseTitle=document.title;
+function updateTitle(){ document.title=hiddenNew?`(${hiddenNew}) ${baseTitle}`:baseTitle; }
+function alertUser(kind,title,body,goTab){
+  const icon=kind==="chat"?"💬":"🎲";
+  if(document.hidden){
+    hiddenNew++; updateTitle(); systemNote(title,body,goTab,kind); beep();
+    return;
+  }
+  const lookingAtIt = kind==="chat" ? tab==="chat" : tab==="game";
+  beep();
+  if(!lookingAtIt){ toast(title,body,goTab,icon); try{ navigator.vibrate&&navigator.vibrate([120,60,120]); }catch(e){} }
+}
+function openTab(v){ tab=v; if(v==="chat"){ unread=0; lastSeenChat=now(); store("tod.seen",String(lastSeenChat)); } render(); }
+function notifBar(){
+  if(!canNotify()||Notification.permission!=="default"||store("tod.nonotif")) return "";
+  return `<div class="nbar"><span>🔔 Get a pop-up when ${esc(NAMES[other(me)])} messages or it's your turn</span><span><button class="btn" data-act="notif">Turn on</button> <button class="link" data-act="notifno">No</button></span></div>`;
+}
 setInterval(()=>{ heartbeat(); render(); },15000);
 
 /* ---------- rendering ---------- */
@@ -291,7 +427,7 @@ function view(){
     <p class="hint">Send this same link to the other person. They open it and tap their own name.</p></div>`;
   const s=state;
   const chatBadge=unread?`<span class="badge">${unread}</span>`:"";
-  return `${netBar()}
+  return `${netBar()}${notifBar()}
   <div class="score">
     ${scoreSide("inno",s)}
     <div class="vs">Round ${s.round}<small>${s.phase==="over"?"Game over":"Truth +1 · Dare +2"}</small></div>
@@ -398,7 +534,8 @@ function awardsView(s){
 }
 
 function chatView(){
-  const list=chat.length?chat.map(m=>`<div class="msg ${m.who===me?"me":""}">${esc(m.text)}<time>${m.who===me?"You":esc(NAMES[m.who]||"")} · ${new Date(m.ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</time></div>`).join("")
+  const tick=m=>m.who!==me?"":delivered.has(m.id)?`<span class="tick ok">✓✓ Delivered</span>`:`<span class="tick">${connected?"✓ Sent":"⏳ Waiting for connection"}</span>`;
+  const list=chat.length?chat.map(m=>`<div class="msg ${m.who===me?"me":""}">${esc(m.text)}<time>${m.who===me?"You":esc(NAMES[m.who]||"")} · ${new Date(m.ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}${tick(m)}</time></div>`).join("")
     :`<div class="empty">No messages yet. Say hi to ${esc(NAMES[other(me)])}.</div>`;
   return `<div class="chat"><div class="msgs" id="msgs">${list}</div>
     ${partnerTyping()?`<p class="wait" style="color:var(--muted)"><span class="typing"><span></span><span></span><span></span></span>${esc(NAMES[other(me)])} is typing…</p>`:""}
@@ -416,7 +553,7 @@ function roundsView(){
 
 /* ---------- moves ---------- */
 function save(next){
-  next.v=(state.v||0)+1; next.ts=Date.now(); next.by=me;
+  next.v=(state.v||0)+1; next.ts=now(); next.by=me;
   if(next.rounds&&next.rounds.length>80) next.rounds=next.rounds.slice(-80);
   state=next; flash=""; store("tod.state",JSON.stringify(state));
   publish("state",state,true);
@@ -431,7 +568,7 @@ function finishRound(reaction,comment,bonus){
   if(bonus&&!s.chicken) points+=1;
   s.scores[ans]+=points;
   const rec={round:s.round,asker:s.asker,answerer:ans,choice:s.choice,question:s.question,answer:s.answer,chicken:!!s.chicken,
-    reaction:reaction||"",comment:comment||"",bonus:!!bonus,points,ts:Date.now()};
+    reaction:reaction||"",comment:comment||"",bonus:!!bonus,points,ts:now()};
   if(!Array.isArray(s.rounds)) s.rounds=[];
   s.rounds.push(rec);
   s.last=rec; s.round+=1; s.asker=ans; s.phase="choose"; s.choice=null; s.question=""; s.answer=""; s.chicken=false;
@@ -439,7 +576,7 @@ function finishRound(reaction,comment,bonus){
 }
 
 let typingTimer=null, typingOn=false;
-function setTyping(on){ if(on===typingOn) return; typingOn=on; publish("typing",{who:me,cid:myCid,on}); }
+function setTyping(on){ if(on===typingOn) return; typingOn=on; publish("typing",{who:me,cid:myCid,on},false,0); }
 
 app.addEventListener("input",e=>{
   if(e.target.dataset&&e.target.dataset.typing){ setTyping(true); clearTimeout(typingTimer); typingTimer=setTimeout(()=>setTyping(false),2500); }
@@ -451,20 +588,24 @@ function sendChat(){
   const t=val("chatbox"); if(!t) return;
   draft.chatbox=""; const el=document.getElementById("chatbox"); if(el){ el.value=""; el.focus(); }
   setTyping(false);
-  const m={id:uid(),who:me,text:t.slice(0,2000),ts:Date.now()};
+  // always sorts after every message this phone has already seen, even if the clocks disagree
+  const latest=chat.reduce((x,c)=>Math.max(x,c.ts||0),0);
+  const m={id:uid(),who:me,text:t.slice(0,2000),ts:Math.max(now(),latest+1)};
   mergeChat([m]);
-  publish("msg",m,false);
-  publish("chat",{list:chat.slice(-100)},true);
-  lastSeenChat=Date.now(); store("tod.seen",String(lastSeenChat));
+  publish("msg",m,false,1);
+  publish("chat",{list:chat.slice(-100)},true,1);
+  lastSeenChat=m.ts; store("tod.seen",String(lastSeenChat));
   render();
 }
 
 app.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]"); if(!b) return;
   const act=b.dataset.act, v=b.dataset.v;
-  if(act==="me"){ me=v; store("tod.me",v); publish("hello",{who:me,cid:myCid}); render(); return; }
+  if(act==="me"){ me=v; store("tod.me",v); publish("hello",{who:me,cid:myCid},false,0); render(); return; }
   if(act==="switch"){ me=null; store("tod.me",null); render(); return; }
-  if(act==="tab"){ tab=v; if(v==="chat"){ unread=0; lastSeenChat=Date.now(); store("tod.seen",String(lastSeenChat)); } render(); return; }
+  if(act==="tab"){ openTab(v); return; }
+  if(act==="notif"){ try{ Notification.requestPermission().then(()=>{ render(); if(Notification.permission==="granted") toast("Notifications on","You'll get a pop-up even when the game is in the background.",null,"🔔"); }); }catch(e){} return; }
+  if(act==="notifno"){ store("tod.nonotif","1"); render(); return; }
   if(act==="bonus"){ draft._bonus=b.checked; return; }
   if(act==="rx"){ draft._react = draft._react===v ? "" : v; render(); return; }
   if(act==="shuffle"){ const el=document.getElementById("qbox"); const q=pick(state.choice==="truth"?TRUTHS:DARES); draft.qbox=q; if(el) el.value=q; return; }
@@ -482,8 +623,15 @@ app.addEventListener("click",e=>{
   if(act==="chicken"){ const s=cur(); s.answer=""; s.chicken=true; s.phase="react"; setTyping(false); save(s); return; }
   if(act==="react"){ const none=v==="none"; finishRound(none?"":draft._react, none?"":val("cbox"), none?false:!!(document.getElementById("bonus")||{}).checked); return; }
 });
-document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ heartbeat(); render(); } });
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ hiddenNew=0; updateTitle(); heartbeat(); resendPending(); render(); } });
+["pointerdown","keydown","touchstart"].forEach(ev=>document.addEventListener(ev,unlockAudio,{capture:true,passive:true}));
 
+if("serviceWorker" in navigator && location.protocol==="https:"){
+  navigator.serviceWorker.register("sw.js").then(r=>{ swReg=r; }).catch(()=>{});
+  navigator.serviceWorker.addEventListener("message",e=>{ if(e.data&&e.data.open&&me){ openTab(e.data.open); } });
+}
+
+syncClock(); setInterval(syncClock,10*60*1000);
 render();
 connect();
 })();
