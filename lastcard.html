@@ -179,7 +179,7 @@ const NAMES={inno:"Inno",leana:"Leana"};
 const other=p=>p==="inno"?"leana":"inno";
 const SUITS=["S","H","C","D"], SYM={S:"♠",H:"♥",D:"♦",C:"♣"}, SUITNAME={S:"Spades",H:"Hearts",D:"Diamonds",C:"Clubs"};
 const RANKS=["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
-const HAND_SIZE=7;
+const HAND_SIZE=5;
 const CLEAN=["3","4","5","6","9","10","Q"];          // the only cards you can finish on
 const ACTION=["JOKER","2","A","7","8","J","K"];       // finishing on one of these = no effect + pick up 2
 const AGAIN=["7","J","K"];                           // with two players, 7 (skip), J (reverse) and K (extra turn) all mean: play again
@@ -261,10 +261,10 @@ const Game={
     s.deck=Deck.fresh();
     for(let i=0;i<HAND_SIZE;i++){ s.hands.inno.push(s.deck.pop()); s.hands.leana.push(s.deck.pop()); }
     let top=s.deck.pop(), guard=0;
-    while(rankOf(top)==="JOKER"&&guard++<10){ s.deck.unshift(top); top=s.deck.pop(); } // a Joker has no suit to follow, so flip again
+    while(!CLEAN.includes(rankOf(top))&&guard++<60){ s.deck.unshift(top); top=s.deck.pop(); } // the game only starts on a finishing card (3, 4, 5, 6, 9, 10, Q)
     s.pile=[top]; s.suit=suitOf(top); s.phase="play";
     s.turn=s.next; s.next=other(s.turn);
-    Game.log(s,`New game. ${NAMES[s.turn]} starts on ${label(top)}${isAction(top)?" (its action doesn't count at the start)":""}.`);
+    Game.log(s,`New game. ${NAMES[s.turn]} starts on ${label(top)}.`);
     return s;
   },
   // play card c for player p; chosen = suit asked for with an 8
@@ -488,7 +488,8 @@ function view(){
 }
 function rulesList(){
   return `<ul>
-      <li>54 cards (with 2 Jokers), 7 each. Match the top card's <b>suit or number</b>.</li>
+      <li>54 cards (with 2 Jokers), 5 each. The game always starts on a 3, 4, 5, 6, 9, 10 or Q. Match the top card's <b>suit or number</b>.</li>
+      <li>When the deck runs out, the played cards are shuffled back in automatically.</li>
       <li>Can't play? Pick up 1. If it fits, you can play it straight away; if not, your turn passes.</li>
       <li><b>Joker</b> — goes on anything. ${NAMES[other(me)]||"The other player"} picks up 5. Jokers stack: 5 → 10 → 15.</li>
       <li><b>2</b> — pick up 2. A 2 on a 2 stacks: 2 → 4 → 6.</li>
