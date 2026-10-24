@@ -182,7 +182,8 @@ const NAMES={inno:"Inno",leana:"Leana"};
 const other=p=>p==="inno"?"leana":"inno";
 const SUITS=["S","H","C","D"], SYM={S:"♠",H:"♥",D:"♦",C:"♣"}, SUITNAME={S:"Spades",H:"Hearts",D:"Diamonds",C:"Clubs"};
 const RANKS=["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
-const HAND_SIZE=5;
+const HAND_SIZE=5;                                   // default; you choose 3–8 before each deal
+const HAND_CHOICES=[3,4,5,6,7,8];
 const CLEAN=["3","4","5","6","9","10","Q"];          // the only cards you can finish on
 const ACTION=["JOKER","2","A","7","8","J","K"];       // finishing on one of these = no effect + pick up 2
 const AGAIN=["7","J","K"];                           // with two players, 7 (skip), J (reverse) and K (extra turn) all mean: play again
@@ -226,7 +227,7 @@ const Hand={
 
 /* ================= Game state manager ================= */
 const Game={
-  fresh:()=>({gameId:"c"+uid(),v:0,ts:0,by:null,phase:"lobby",variant:"zim8",
+  fresh:()=>({gameId:"c"+uid(),v:0,ts:0,by:null,phase:"lobby",variant:"zim8",handSize:HAND_SIZE,
     hands:{inno:[],leana:[]},deck:[],pile:[],turn:null,suit:null,pending:0,pendKind:null,drawn:null,
     winner:null,wins:{inno:0,leana:0},next:"inno",log:[],lastAct:""}),
   normalize(s){
@@ -263,8 +264,9 @@ const Game={
   deal(prev){
     const s=Game.fresh();
     s.wins=Object.assign({inno:0,leana:0},prev.wins||{}); s.next=prev.next||"inno";
+    s.handSize=HAND_CHOICES.includes(prev.handSize)?prev.handSize:HAND_SIZE;
     s.deck=Deck.fresh();
-    for(let i=0;i<HAND_SIZE;i++){ s.hands.inno.push(s.deck.pop()); s.hands.leana.push(s.deck.pop()); }
+    for(let i=0;i<s.handSize;i++){ s.hands.inno.push(s.deck.pop()); s.hands.leana.push(s.deck.pop()); }
     let top=s.deck.pop(), guard=0;
     while(!CLEAN.includes(rankOf(top))&&guard++<60){ s.deck.unshift(top); top=s.deck.pop(); } // the game only starts on a finishing card (3, 4, 5, 6, 9, 10, Q)
     s.pile=[top]; s.suit=suitOf(top); s.phase="play";
@@ -493,7 +495,7 @@ function view(){
 }
 function rulesList(){
   return `<ul>
-      <li>54 cards (with 2 Jokers), 5 each. The game always starts on a 3, 4, 5, 6, 9, 10 or Q. Match the top card's <b>suit or number</b>.</li>
+      <li>54 cards (with 2 Jokers), ${state.handSize||HAND_SIZE} each (you choose before dealing). The game always starts on a 3, 4, 5, 6, 9, 10 or Q. Match the top card's <b>suit or number</b>.</li>
       <li>When the deck runs out, the played cards are shuffled back in automatically.</li>
       <li>Can't play, or don't want to? Pick up 1. If it fits, you can play it straight away or keep it; if not, your turn passes.</li>
       <li><b>Joker</b> — goes on anything. ${NAMES[other(me)]||"The other player"} picks up 5. Jokers stack: 5 → 10 → 15. After the pick-up, any card can go on the Joker.</li>
@@ -505,13 +507,18 @@ function rulesList(){
       <li><b>Clean finish:</b> you can only win on a <b>3, 4, 5, 6, 9, 10 or Q</b>. If your last card is an action card (Joker, 2, A, 7, 8, J, K), it does nothing and you pick up 2.</li>
     </ul>`;
 }
+function handPicker(s){
+  const n=s.handSize||HAND_SIZE;
+  return `<div class="opt"><span>Cards each<small>Either of you can change it; both phones see it</small></span><span class="seg">${HAND_CHOICES.map(k=>`<button data-act="hand" data-v="${k}" aria-pressed="${n===k}">${k}</button>`).join("")}</span></div>`;
+}
 function lobbyView(s){
   return `<div class="panel"><h2>ZIM8</h2>
     <p>The aggressive Zimbabwean Crazy Eights. Finish clean on one of these to win:</p>
     <div class="closers">${CLEAN.map(k=>`<span>${k}</span>`).join("")}</div>
     <div style="font-size:14px;color:#4f4357">${rulesList()}</div>
     <p style="font-size:14px">${NAMES[s.next||"inno"]} plays first. Either of you can deal.</p>
-    <button class="btn" data-act="deal">Deal cards</button></div>
+    ${handPicker(s)}
+    <button class="btn" data-act="deal">Deal ${s.handSize||HAND_SIZE} cards each</button></div>
     <div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">switch</button></span><a class="link" href="./">Truth or Dare →</a></div>`;
 }
 function tableView(s){
@@ -526,7 +533,8 @@ function tableView(s){
     body=`<div class="panel"><h2>${won?"Clean finish! 🏆":`${NAMES[s.winner]} finished clean`}</h2>
       ${left.length?`<p>${loser===me?"You were":NAMES[loser]+" was"} left holding ${left.length} card${left.length===1?"":"s"}:</p><div class="leftover">${Hand.sorted(left).map(c=>cardSpan(c)).join("")}</div>`:""}
       <p>Score: Inno ${s.wins.inno} – ${s.wins.leana} Leana. ${NAMES[s.next]} starts next.</p>
-      <div class="row"><button class="btn" data-act="deal">Deal again</button></div></div>`;
+      ${handPicker(s)}
+      <div class="row"><button class="btn" data-act="deal">Deal again · ${s.handSize||HAND_SIZE} each</button></div></div>`;
   } else {
     const any=myTurn&&Game.canPlayAny(s,me);
     let sub;
@@ -596,6 +604,7 @@ app.addEventListener("click",e=>{
   if(act==="suitcancel"){ suitPick=null; render(); return; }
   if(act==="warncancel"){ lastWarn=null; render(); return; }
   if(act==="suit"){ const c=suitPick; suitPick=null; if(c) doPlay(c,v); return; }
+  if(act==="hand"){ const s=cur(); const n=Number(v); if(!HAND_CHOICES.includes(n)||s.phase==="play") return; s.handSize=n; save(s); return; }
   if(act==="deal"){ suitPick=null; lastWarn=null; const s=Game.deal(state); save(s); return; }
   if(act==="end"){ confirmEnd=true; render(); return; }
   if(act==="endno"){ confirmEnd=false; render(); return; }
@@ -612,7 +621,7 @@ if("serviceWorker" in navigator && location.protocol==="https:"){
 }
 
 /* ---------- self-update: when a new version is published, reload onto it (the game itself is saved, so nothing is lost) ---------- */
-const BUILD="20261024-2330";
+const BUILD="20261024-2325b";
 let updating=false;
 function reloadWhenSafe(b){
   const key="upd-"+location.pathname+"-"+b; try{ if(sessionStorage.getItem(key)) return; sessionStorage.setItem(key,"1"); }catch(e){}
