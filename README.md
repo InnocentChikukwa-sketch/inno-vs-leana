@@ -1,3 +1,6 @@
 # Inno vs Leana
 
-Truth or Dare for two phones. Play at https://innocentchikukwa-sketch.github.io/inno-vs-leana/
+Games for two phones.
+
+- Truth or Dare: https://inno-vs-leana.onrender.com/
+- Last Card: https://inno-vs-leana.onrender.com/lastcard.html
