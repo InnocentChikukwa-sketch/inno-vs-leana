@@ -610,6 +610,24 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ hiddenN
 if("serviceWorker" in navigator && location.protocol==="https:"){
   navigator.serviceWorker.register("sw.js").then(r=>{ swReg=r; }).catch(()=>{});
 }
+
+/* ---------- self-update: when a new version is published, reload onto it (the game itself is saved, so nothing is lost) ---------- */
+const BUILD="20261024-2330";
+let updating=false;
+function reloadWhenSafe(b){
+  const key="upd-"+location.pathname+"-"+b; try{ if(sessionStorage.getItem(key)) return; sessionStorage.setItem(key,"1"); }catch(e){}
+  const go=()=>location.replace(location.pathname+"?v="+encodeURIComponent(b));
+  const busy=()=>!!(suitPick||lastWarn);
+  if(!busy()) return go();
+  const t=setInterval(()=>{ if(!busy()){ clearInterval(t); go(); } },3000);
+}
+async function checkUpdate(){
+  if(updating||!/^https?:$/.test(location.protocol)) return;
+  try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return; const j=await r.json();
+    if(j&&j.build&&j.build!==BUILD){ updating=true; reloadWhenSafe(j.build); } }catch(e){}
+}
+setTimeout(checkUpdate,3000); setInterval(checkUpdate,60000);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkUpdate(); });
 // expose the engine for automated checks (read-only use)
 window.__zim8={Game,Deck,Hand,CLEAN,ACTION};
 render();
