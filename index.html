@@ -297,7 +297,7 @@ function onMessage(topic,buf,packet){
         if(d.by&&d.by!==me&&!packet.retain){ const t=turnAlert(state); if(t) alertUser("game",t[0],t[1],"game"); }
       }
       render();
-    }
+    } else if(d.gameId&&d.scores&&state.v>0&&newer(state,d)) republishSoon(); // someone sent an older game: put the newest back
   } else if(sub==="chat"){
     const list=Array.isArray(d.list)?d.list:[];
     if(mergeChat(list)) render();
@@ -315,6 +315,7 @@ function onMessage(topic,buf,packet){
     if(d.who==="inno"||d.who==="leana"){
       if(d.cid===myCid) return;
       if(!packet.retain) lastSeen[d.who]=Date.now();
+      if(typeof d.v==="number"&&d.v<state.v) republishSoon(); // the other phone is behind: send it the latest game
       if(sub==="hello"&&me){ heartbeat(); if(chat.length) publish("chat",{list:chat.slice(-100)},true,1); resendPending(); }
       render();
     }
@@ -332,12 +333,16 @@ function connect(){
     c._up=false;
     c.on("connect",()=>{
       c._up=true; everConnected=true; recount();
-      c.subscribe(BASE+"#",{qos:0},()=>{
-        if(me){ c.publish(BASE+"hello",JSON.stringify({who:me,cid:myCid}),{qos:0}); }
-        // make sure this relay holds the newest game and chat we know
-        if(state.v>0) c.publish(BASE+"state",JSON.stringify(state),{qos:1,retain:true});
-        if(chat.length) c.publish(BASE+"chat",JSON.stringify({list:chat.slice(-100)}),{qos:1,retain:true});
-        setTimeout(resendPending,800);
+      c.subscribe(BASE+"#",{qos:1},()=>{
+        if(me){ c.publish(BASE+"hello",JSON.stringify({who:me,cid:myCid,v:state.v}),{qos:0}); }
+        // First listen for the relay's saved game, THEN put back the newest one we know.
+        // (Saving straight away could overwrite newer moves with this phone's older copy.)
+        setTimeout(()=>{
+          if(!c._up) return;
+          if(state.v>0) c.publish(BASE+"state",JSON.stringify(state),{qos:1,retain:true});
+          if(chat.length) c.publish(BASE+"chat",JSON.stringify({list:chat.slice(-100)}),{qos:1,retain:true});
+          resendPending();
+        },2500);
       });
     });
     c.on("close",()=>{ c._up=false; recount(); });
@@ -348,7 +353,9 @@ function connect(){
   });
 }
 function recount(){ const n=clients.filter(c=>c._up).length; if(n!==connected){ connected=n; render(); } }
-function heartbeat(){ if(me) publish("hb",{who:me,cid:myCid},false,0); }
+function heartbeat(){ if(me) publish("hb",{who:me,cid:myCid,v:state.v},false,0); }
+let repubT=null;
+function republishSoon(){ clearTimeout(repubT); repubT=setTimeout(()=>{ if(state.v>0) publish("state",state,true,1); },400+Math.random()*900); }
 
 /* ---------- alerts: pop-up inside the game, beep and buzz, and a phone notification when the game is in the background ---------- */
 const toastEl=document.createElement("div"); toastEl.className="toast"; toastEl.setAttribute("role","status"); toastEl.setAttribute("aria-live","polite");
@@ -601,7 +608,7 @@ function sendChat(){
 app.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]"); if(!b) return;
   const act=b.dataset.act, v=b.dataset.v;
-  if(act==="me"){ me=v; store("tod.me",v); publish("hello",{who:me,cid:myCid},false,0); render(); return; }
+  if(act==="me"){ me=v; store("tod.me",v); publish("hello",{who:me,cid:myCid,v:state.v},false,0); render(); return; }
   if(act==="switch"){ me=null; store("tod.me",null); render(); return; }
   if(act==="tab"){ openTab(v); return; }
   if(act==="notif"){ try{ Notification.requestPermission().then(()=>{ render(); if(Notification.permission==="granted") toast("Notifications on","You'll get a pop-up even when the game is in the background.",null,"🔔"); }); }catch(e){} return; }

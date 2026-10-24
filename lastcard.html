@@ -272,7 +272,8 @@ function connect(){
       c._up=true; everConnected=true; recount();
       c.subscribe(BASE+"#",{qos:1},()=>{
         if(me) c.publish(BASE+"hello",JSON.stringify({who:me,cid:myCid,v:state.v}),{qos:0});
-        if(state.v>0) c.publish(BASE+"state",JSON.stringify(state),{qos:1,retain:true});
+        // listen for the saved game first, then put back the newest one we know
+        setTimeout(()=>{ if(c._up&&state.v>0) c.publish(BASE+"state",JSON.stringify(state),{qos:1,retain:true}); },2500);
       });
     });
     c.on("close",()=>{ c._up=false; recount(); });
