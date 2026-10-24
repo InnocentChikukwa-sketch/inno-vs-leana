@@ -251,6 +251,7 @@ const Game={
       return {ok:false,why:"pending"};
     }
     if(k==="JOKER"||k==="8") return {ok:true};                        // Jokers and 8s go on anything
+    if(k==="Q"&&Game.matchRank(s)==="10") return {ok:true};            // a Q can go on any 10
     if(k===Game.matchRank(s)||suitOf(c)===s.suit) return {ok:true};
     return {ok:false,why:"match"};
   },
@@ -441,7 +442,7 @@ function whyText(why,c){
   if(why==="turn") return s.phase==="play"?`Wait — it's ${NAMES[s.turn]}'s turn.`:"";
   if(why==="drawn") return `You picked up ${label(s.drawn)}. Play that card or keep it and pass.`;
   if(why==="pending") return `Pick up ${s.pending} is coming. Block it with an Ace, ${s.pendKind==="two"?"add a 2":"add a Joker"}, or pick up.`;
-  return `${label(c)} doesn't match. Play ${SYM[s.suit]} or a ${Game.matchRank(s)}, an 8 or a Joker${Game.canPlayAny(s,me)?"":", or pick up"}.`;
+  return `${label(c)} doesn't match. Play ${SYM[s.suit]} or a ${Game.matchRank(s)}${Game.matchRank(s)==="10"?", a Q":""}, an 8 or a Joker${Game.canPlayAny(s,me)?"":", or pick up"}.`;
 }
 function doPlay(c,chosen){
   const s=cur(), chk=Game.check(s,c,me);
@@ -495,6 +496,7 @@ function rulesList(){
       <li><b>2</b> — pick up 2. A 2 on a 2 stacks: 2 → 4 → 6.</li>
       <li><b>A</b> — blocks a pick-up coming at you (from 2s or Jokers). Otherwise a normal card.</li>
       <li><b>8</b> — goes on anything; you choose the next suit.</li>
+      <li><b>Q on 10</b> — a Q can go on any 10, whatever the suit.</li>
       <li><b>7</b> (skip), <b>J</b> (reverse) and <b>K</b> (extra turn) — with two players, all three mean <b>you play again</b>.</li>
       <li><b>Clean finish:</b> you can only win on a <b>3, 4, 5, 6, 9, 10 or Q</b>. If your last card is an action card (Joker, 2, A, 7, 8, J, K), it does nothing and you pick up 2.</li>
     </ul>`;
@@ -539,7 +541,7 @@ function tableView(s){
   }
   const matchLine = s.phase==="play"
     ? (s.pending?`<span class="pending">Pick up ${s.pending} is on · ${s.pendKind==="joker"?"Joker":"2"}s stack, Ace blocks</span>`
-      :`<div class="match">Play <b class="${s.suit==="H"||s.suit==="D"?"redt":""}">${SYM[s.suit]} ${SUITNAME[s.suit]}</b> or a <b>${esc(Game.matchRank(s))}</b> · 8s &amp; Jokers go on anything</div>`)
+      :`<div class="match">Play <b class="${s.suit==="H"||s.suit==="D"?"redt":""}">${SYM[s.suit]} ${SUITNAME[s.suit]}</b> or a <b>${esc(Game.matchRank(s))}</b>${Game.matchRank(s)==="10"?" or a <b>Q</b>":""} · 8s &amp; Jokers go on anything</div>`)
     : "";
   const recent=s.log.slice(-4).reverse();
   const foot=confirmEnd
