@@ -490,7 +490,7 @@ function rulesList(){
   return `<ul>
       <li>54 cards (with 2 Jokers), 5 each. The game always starts on a 3, 4, 5, 6, 9, 10 or Q. Match the top card's <b>suit or number</b>.</li>
       <li>When the deck runs out, the played cards are shuffled back in automatically.</li>
-      <li>Can't play? Pick up 1. If it fits, you can play it straight away; if not, your turn passes.</li>
+      <li>Can't play, or don't want to? Pick up 1. If it fits, you can play it straight away or keep it; if not, your turn passes.</li>
       <li><b>Joker</b> — goes on anything. ${NAMES[other(me)]||"The other player"} picks up 5. Jokers stack: 5 → 10 → 15.</li>
       <li><b>2</b> — pick up 2. A 2 on a 2 stacks: 2 → 4 → 6.</li>
       <li><b>A</b> — blocks a pick-up coming at you (from 2s or Jokers). Otherwise a normal card.</li>
@@ -527,12 +527,12 @@ function tableView(s){
     if(!myTurn) sub=esc(s.lastAct);
     else if(s.drawn) sub=`You picked up ${esc(label(s.drawn))} and it fits. Play it, or keep it and pass.`;
     else if(s.pending) sub=any?`Block with an Ace${s.pendKind==="two"?", add a 2":", add a Joker"}, or pick up ${s.pending}`:`Nothing can stop it. Pick up ${s.pending}.`;
-    else sub=any?"Tap a glowing card to play it":"Nothing matches. Pick up a card.";
+    else sub=any?"Tap a glowing card to play it, or pick up instead":"Nothing matches. Pick up a card.";
     status=`<div class="status ${myTurn?"mine":""}">${myTurn?(s.pending?`Pick up ${s.pending} coming!`:"Your turn"):`${NAMES[o]}'s turn…`}<small>${sub}</small></div>`;
     const btn = !myTurn ? "" :
       s.drawn ? `<div class="row"><button class="btn ghost" data-act="pass">Keep it &amp; pass</button><button class="btn" data-act="card" data-v="${esc(s.drawn)}">Play ${esc(label(s.drawn))}</button></div>` :
       s.pending ? `<div class="row"><button class="btn warn" data-act="draw">Pick up ${s.pending}</button></div>` :
-      !any ? `<div class="row"><button class="btn" data-act="draw">Pick up 1</button></div>` : "";
+      `<div class="row"><button class="btn ${any?"ghost":""}" data-act="draw">Pick up 1</button></div>`;
     body=`<div class="hand" aria-label="Your cards">${Hand.sorted(mh).map(c=>{const ok=myTurn&&Game.check(s,c,me).ok, risky=ok&&mh.length===1&&!CLEAN.includes(rankOf(c));
         return `<button class="cd ${cardCls(c)} ${myTurn?(ok?"ok":"no"):""} ${risky?"risky":""} ${c===s.drawn?"new":""}" data-act="card" data-v="${esc(c)}" aria-label="${esc(label(c))}${ok?", playable":""}">${face(c)}</button>`;}).join("")}</div>
       ${btn}`;
@@ -548,7 +548,7 @@ function tableView(s){
   return `<div class="opp"><div class="backs" aria-label="${NAMES[o]} has ${oh.length} cards">${backs}</div>
       <span>${NAMES[o]} · ${oh.length} card${oh.length===1?"":"s"}${oh.length===1&&s.phase==="play"?` · <span class="lastcard">LAST CARD</span>`:""}</span></div>
     <div class="table">
-      <button class="deckbtn" data-act="draw" ${myTurn&&!s.drawn&&(s.pending||!Game.canPlayAny(s,me))?"":"disabled"} aria-label="Pick up from the deck"><span class="cd back"></span><span class="cd back"></span><b>${s.deck.length}</b></button>
+      <button class="deckbtn" data-act="draw" ${myTurn&&!s.drawn?"":"disabled"} aria-label="Pick up from the deck"><span class="cd back"></span><span class="cd back"></span><b>${s.deck.length}</b></button>
       ${top?cardSpan(top,"big"+(pop?" pop":"")):""}
       ${matchLine}
     </div>
@@ -594,7 +594,6 @@ app.addEventListener("click",e=>{
   if(act==="endno"){ confirmEnd=false; render(); return; }
   if(act==="endyes"){ confirmEnd=false; const s=cur(); s.phase="lobby"; s.turn=null; s.drawn=null; Game.log(s,`${NAMES[me]} stopped the game`); save(s); return; }
   if(act==="draw"){ const s=cur(); if(s.phase!=="play"||s.turn!==me||s.drawn) return;
-    if(!s.pending&&Game.canPlayAny(s,me)){ flash="You have a card that fits, so you have to play. Tap a glowing card."; render(); return; }
     Game.pickUp(s,me); save(s); return; }
   if(act==="pass"){ const s=cur(); if(s.turn!==me||!s.drawn) return; Game.pass(s,me); save(s); return; }
   if(act==="card"){ tapCard(v); return; }
