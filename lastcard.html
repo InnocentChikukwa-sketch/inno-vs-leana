@@ -250,7 +250,7 @@ const Game={
     if(s.drawn&&c!==s.drawn) return {ok:false,why:"drawn"};
     if(s.pending>0){
       if(k==="A") return {ok:true};                                   // Ace blocks any incoming pick-up
-      if(s.pendKind==="two"&&k==="2") return {ok:true};               // 2 on 2 stacks
+      if(k==="2") return {ok:true};                                    // a 2 adds 2 to any pick-up (on a 2 or on a Joker)
       if(s.pendKind==="joker"&&k==="JOKER") return {ok:true};         // Joker on Joker stacks
       return {ok:false,why:"pending"};
     }
@@ -292,7 +292,7 @@ const Game={
       Game.log(s,`${txt} as the last card. Action cards can't finish, so it does nothing and ${NAMES[p]} picks up ${got.length}${owed>2?` (2 + the ${owed-2} that was coming)`:""}`);
       return;
     }
-    if(k==="JOKER"){ s.pending+=5; s.pendKind="joker"; s.turn=o; txt+=`. ${NAMES[o]} picks up ${s.pending} or blocks with an Ace${s.pending>5?"":""}`; }
+    if(k==="JOKER"){ s.pending+=5; s.pendKind="joker"; s.turn=o; txt+=`. ${NAMES[o]} picks up ${s.pending}, adds a 2 or Joker, or blocks with an Ace`; }
     else if(k==="2"){ s.pending+=2; s.pendKind="two"; s.suit=suitOf(c); s.turn=o; txt+=`. ${NAMES[o]} picks up ${s.pending}, plays a 2, or blocks with an Ace`; }
     else if(k==="A"&&s.pending>0){ txt+=` and blocked the pick-up ${s.pending}`; s.pending=0; s.pendKind=null; s.suit=suitOf(c); s.turn=o; }
     else if(k==="8"){ s.suit=chosen||suitOf(c); s.turn=o; txt+=` and asked for ${SUITNAME[s.suit]} ${SYM[s.suit]}`; }
@@ -447,7 +447,7 @@ function whyText(why,c){
   const s=state;
   if(why==="turn") return s.phase==="play"?`Wait — it's ${NAMES[s.turn]}'s turn.`:"";
   if(why==="drawn") return `You picked up ${label(s.drawn)}. Play that card or keep it and pass.`;
-  if(why==="pending") return `Pick up ${s.pending} is coming. Block it with an Ace, ${s.pendKind==="two"?"add a 2":"add a Joker"}, or pick up.`;
+  if(why==="pending") return `Pick up ${s.pending} is coming. Block it with an Ace, add a 2${s.pendKind==="joker"?" or a Joker":""}, or pick up.`;
   return `${label(c)} doesn't match. Play ${SYM[s.suit]} or a ${Game.matchRank(s)}${Game.matchRank(s)==="10"?", a Q":""}, an 8 or a Joker${Game.canPlayAny(s,me)?"":", or pick up"}.`;
 }
 function doPlay(c,chosen){
@@ -498,8 +498,8 @@ function rulesList(){
       <li>54 cards (with 2 Jokers), ${state.handSize||HAND_SIZE} each (you choose before dealing). The game always starts on a 3, 4, 5, 6, 9, 10 or Q. Match the top card's <b>suit or number</b>.</li>
       <li>When the deck runs out, the played cards are shuffled back in automatically.</li>
       <li>Can't play, or don't want to? Pick up 1. If it fits, you can play it straight away or keep it; if not, your turn passes.</li>
-      <li><b>Joker</b> — goes on anything. ${NAMES[other(me)]||"The other player"} picks up 5. Jokers stack: 5 → 10 → 15. After the pick-up, any card can go on the Joker.</li>
-      <li><b>2</b> — pick up 2. A 2 on a 2 stacks: 2 → 4 → 6.</li>
+      <li><b>Joker</b> — goes on anything. ${NAMES[other(me)]||"The other player"} picks up 5. Jokers stack: 5 → 10 → 15, and a 2 adds on too: 5 → 7. After the pick-up, any card can go on the Joker.</li>
+      <li><b>2</b> — pick up 2. A 2 on a 2 stacks: 2 → 4 → 6. A 2 can also go on a Joker's pick-up and adds 2.</li>
       <li><b>A</b> — blocks a pick-up coming at you (from 2s or Jokers). Otherwise a normal card.</li>
       <li><b>8</b> — goes on anything; you choose the next suit.</li>
       <li><b>Q on 10</b> — a Q can go on any 10, whatever the suit.</li>
@@ -540,7 +540,7 @@ function tableView(s){
     let sub;
     if(!myTurn) sub=esc(s.lastAct);
     else if(s.drawn) sub=`You picked up ${esc(label(s.drawn))} and it fits. Play it, or keep it and pass.`;
-    else if(s.pending) sub=any?`Block with an Ace${s.pendKind==="two"?", add a 2":", add a Joker"}, or pick up ${s.pending}`:`Nothing can stop it. Pick up ${s.pending}.`;
+    else if(s.pending) sub=any?`Block with an Ace, add a 2${s.pendKind==="joker"?" or a Joker":""}, or pick up ${s.pending}`:`Nothing can stop it. Pick up ${s.pending}.`;
     else sub=any?"Tap a glowing card to play it, or pick up instead":"Nothing matches. Pick up a card.";
     status=`<div class="status ${myTurn?"mine":""}">${myTurn?(s.pending?`Pick up ${s.pending} coming!`:"Your turn"):`${NAMES[o]}'s turn…`}<small>${sub}</small></div>`;
     const btn = !myTurn ? "" :
@@ -552,7 +552,7 @@ function tableView(s){
       ${btn}`;
   }
   const matchLine = s.phase==="play"
-    ? (s.pending?`<span class="pending">Pick up ${s.pending} is on · ${s.pendKind==="joker"?"Joker":"2"}s stack, Ace blocks</span>`
+    ? (s.pending?`<span class="pending">Pick up ${s.pending} is on · ${s.pendKind==="joker"?"2s &amp; Jokers add on":"2s add on"}, Ace blocks</span>`
       :rankOf(Game.top(s)||"")==="JOKER"?`<div class="match"><b>Anything goes</b> on a Joker</div>`
       :`<div class="match">Play <b class="${s.suit==="H"||s.suit==="D"?"redt":""}">${SYM[s.suit]} ${SUITNAME[s.suit]}</b> or a <b>${esc(Game.matchRank(s))}</b>${Game.matchRank(s)==="10"?" or a <b>Q</b>":""} · 8s &amp; Jokers go on anything</div>`)
     : "";
@@ -621,7 +621,7 @@ if("serviceWorker" in navigator && location.protocol==="https:"){
 }
 
 /* ---------- self-update: when a new version is published, reload onto it (the game itself is saved, so nothing is lost) ---------- */
-const BUILD="20261024-2325b";
+const BUILD="20261024-2340";
 let updating=false;
 function reloadWhenSafe(b){
   const key="upd-"+location.pathname+"-"+b; try{ if(sessionStorage.getItem(key)) return; sessionStorage.setItem(key,"1"); }catch(e){}
