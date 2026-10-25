@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>if(location.hostname==="inno-vs-leana.onrender.com")location.replace("https://zimgames.onrender.com"+location.pathname+location.search+location.hash);</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0F7F84">
 <title>Snakes &amp; Ladders · Game room</title>
@@ -442,7 +443,7 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ hiddenN
 if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").then(r=>{ swReg=r; }).catch(()=>{});
 
 /* ---------- self-update (same as the other games) ---------- */
-const BUILD="20261025-0915"; let updating=false;
+const BUILD="20261025-0930b"; let updating=false;
 function reloadWhenSafe(b){ const key="upd-"+location.pathname+"-"+b; try{ if(sessionStorage.getItem(key)) return; sessionStorage.setItem(key,"1"); }catch(e){}
   const go=()=>location.replace(location.pathname+"?v="+encodeURIComponent(b)); if(!rolling&&!animating) return go(); const t=setInterval(()=>{ if(!rolling&&!animating){ clearInterval(t); go(); } },3000); }
 async function checkUpdate(){ if(updating||!/^https?:$/.test(location.protocol)) return; try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return; const j=await r.json(); if(j&&j.build&&j.build!==BUILD){ updating=true; reloadWhenSafe(j.build); } }catch(e){} }

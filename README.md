@@ -1,6 +1,6 @@
 # Game room
 
-Games for couples, live on two phones: https://inno-vs-leana.onrender.com/
+Games for couples, live on two phones: https://zimgames.onrender.com/
 
 - Truth or Dare: truth-or-dare.html
 - ZIM8 (cards): lastcard.html
