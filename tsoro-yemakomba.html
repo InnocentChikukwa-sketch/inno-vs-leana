@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tsoro yemakomba · Sowing puzzle</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{background:#FFD200;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .board{position:relative;width:min(92vw,440px);aspect-ratio:1;margin:0 auto;border-radius:50%;background:radial-gradient(circle at 50% 40%,#8a5a2b,#5b3716);box-shadow:0 8px 0 rgba(0,0,0,.85),inset 0 0 40px rgba(0,0,0,.45)}
+  .hole{position:absolute;width:22%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);border:0;cursor:pointer;
+    background:radial-gradient(circle at 50% 35%,#2b1807,#4a2c10);box-shadow:inset 0 6px 12px rgba(0,0,0,.7);color:#fff;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;transition:transform .12s,box-shadow .12s,outline-color .12s;outline:4px solid transparent}
+  .hole .n{font-size:clamp(20px,6.5vw,30px);font-weight:800;line-height:1}
+  .hole .i{position:absolute;top:-2px;left:50%;transform:translate(-50%,-100%);font-size:11px;font-weight:700;color:#FFD200;opacity:.85}
+  .hole:disabled{cursor:default}
+  .hole:not(:disabled):hover{transform:translate(-50%,-50%) scale(1.05)}
+  .hole.active{outline-color:#FFD200;box-shadow:inset 0 6px 12px rgba(0,0,0,.7),0 0 0 6px rgba(255,210,0,.35),0 0 22px 6px #FFD200}
+  .hole.drop{animation:pop .3s ease-out}
+  .hole.hint{outline-color:#27d17f}
+  .hole.empty .n{opacity:.35}
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(1.18)}100%{transform:translate(-50%,-50%) scale(1)}}
+  .btn{font-weight:800;border-radius:999px;padding:.7rem 1.2rem;border:2px solid #000;box-shadow:0 4px 0 #000;transition:transform .08s,box-shadow .08s}
+  .btn:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 #000}
+  .btn:disabled{opacity:.5}
+  @media (prefers-reduced-motion:reduce){.hole.drop{animation:none}}
+</style>
+</head>
+<body class="min-h-screen text-black">
+<main class="max-w-xl mx-auto px-4 py-5">
+  <div class="flex items-center justify-between mb-3">
+    <a href="./" class="font-bold underline">&larr; All games</a>
+    <span class="text-sm font-bold">Moves: <span id="moves">0</span></span>
+  </div>
+  <h1 class="text-3xl font-extrabold tracking-tight">Tsoro yemakomba</h1>
+  <p class="mt-1 text-sm font-medium">Tap a hole. Its seeds are sown clockwise. If your last seed lands in a hole that already has seeds, pick them all up and keep sowing. Stop when the last seed lands in an empty hole. <b>Win by getting every seed into one hole.</b></p>
+
+  <div class="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Seeds per hole">
+    <span class="font-bold text-sm">Seeds per hole:</span>
+    <div id="cfg" class="flex gap-2"></div>
+  </div>
+
+  <div class="my-5"><div id="board" class="board" aria-label="Circular board of 8 holes"></div></div>
+
+  <p id="status" class="text-center font-bold min-h-[1.5rem]" aria-live="polite"></p>
+
+  <div class="mt-3 flex flex-wrap justify-center gap-3">
+    <button id="reset" class="btn bg-white">Restart</button>
+    <button id="solve" class="btn bg-black text-yellow-300">Solve</button>
+    <button id="play" class="btn bg-green-600 text-white hidden">Auto-play solution</button>
+  </div>
+
+  <section id="out" class="mt-5 hidden bg-white/80 border-2 border-black rounded-2xl p-4">
+    <h2 class="font-extrabold">Solution for this board</h2>
+    <p id="outInfo" class="text-sm mt-1"></p>
+    <ol id="outList" class="mt-2 text-sm font-mono leading-6 max-h-56 overflow-auto break-words"></ol>
+  </section>
+</main>
+
+<script>
+"use strict";
+const N = 8;
+const $ = (id) => document.getElementById(id);
+const DELAY = 300;                       // ms between seed drops
+let seeds = 4, board = [], total = 0, busy = false, moves = 0, done = false, solution = null, solving = false, stopAuto = false;
+
+/* ---------- pure engine (shared by the game and the solver) ---------- */
+// Plays hole i on array b. Returns { b, win } or { loop:true } if the sowing would never stop.
+function simulate(b, i, tot) {
+  b = b.slice();
+  let hand = b[i], p = i, laps = 0; b[i] = 0;
+  while (true) {
+    while (hand > 0) { p = (p + 1) % N; b[p]++; hand--; }
+    if (b[p] === tot) return { b, win: true };
+    if (b[p] === 1) return { b, win: false };      // landed in an empty hole: turn over
+    if (++laps > 500) return { loop: true };
+    hand = b[p]; b[p] = 0;                          // chain reaction
+  }
+}
+
+/* Depth-first search with backtracking and a visited set.
+   Returns an array of hole indexes (0-7) or null; { limit:true } when the budget runs out. */
+function dfsSolve(start, maxNodes) {
+  const tot = start.reduce((a, c) => a + c, 0);
+  if (start.some((v) => v === tot)) return { path: [] };
+  const seen = new Set([start.join()]);
+  const stack = [{ b: start, next: 0 }], path = [];
+  let nodes = 0;
+  while (stack.length) {
+    const f = stack[stack.length - 1];
+    if (f.next >= N) { stack.pop(); path.pop(); continue; }   // backtrack
+    const i = f.next++;
+    if (!f.b[i]) continue;
+    const r = simulate(f.b, i, tot);
+    if (r.loop) continue;
+    if (r.win) return { path: path.concat(i), nodes };
+    const k = r.b.join();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    if (++nodes > maxNodes) return { limit: true, nodes };
+    stack.push({ b: r.b, next: 0 }); path.push(i);
+  }
+  return { none: true, nodes };
+}
+
+/* ---------- board drawing ---------- */
+const holes = [];
+function build() {
+  const el = $("board"); el.innerHTML = ""; holes.length = 0;
+  for (let i = 0; i < N; i++) {
+    const ang = (-90 + i * 45) * Math.PI / 180;       // hole 1 at the top, clockwise
+    const b = document.createElement("button");
+    b.className = "hole"; b.type = "button";
+    b.style.left = (50 + 37 * Math.cos(ang)) + "%"; b.style.top = (50 + 37 * Math.sin(ang)) + "%";
+    b.innerHTML = '<span class="i">' + (i + 1) + '</span><span class="n"></span>';
+    b.addEventListener("click", () => play(i));
+    el.appendChild(b); holes.push(b);
+  }
+}
+function paint(active) {
+  holes.forEach((h, i) => {
+    h.querySelector(".n").textContent = board[i];
+    h.classList.toggle("active", i === active);
+    h.classList.toggle("empty", board[i] === 0);
+    h.disabled = busy || done || solving || board[i] === 0;
+    h.setAttribute("aria-label", "Hole " + (i + 1) + ", " + board[i] + " seeds");
+    h.classList.remove("hint");
+  });
+  $("moves").textContent = moves;
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function reset(n) {
+  if (n) seeds = n;
+  stopAuto = true;
+  board = Array(N).fill(seeds); total = N * seeds; moves = 0; done = false; busy = false; solution = null;
+  $("out").classList.add("hidden"); $("play").classList.add("hidden");
+  $("status").textContent = "Pick a hole to start.";
+  document.querySelectorAll("#cfg button").forEach((b) => {
+    const on = +b.dataset.n === seeds;
+    b.className = "btn px-4 py-1 " + (on ? "bg-black text-yellow-300" : "bg-white");
+    b.setAttribute("aria-pressed", on);
+  });
+  paint(-1);
+}
+
+/* ---------- playing a move with animation ---------- */
+async function play(i) {
+  if (busy || done || !board[i]) return;
+  busy = true; solution = null; $("play").classList.add("hidden"); $("out").classList.add("hidden");
+  $("status").textContent = "";
+  let hand = board[i], p = i; board[i] = 0; paint(p);
+  while (true) {
+    while (hand > 0) {
+      await sleep(DELAY);
+      p = (p + 1) % N; board[p]++; hand--;
+      paint(p); holes[p].classList.add("drop");
+    }
+    if (board[p] === total) { moves++; done = true; busy = false; paint(p); $("status").textContent = "You win in " + moves + " moves! All " + total + " seeds are in hole " + (p + 1) + "."; return; }
+    if (board[p] === 1) break;
+    await sleep(DELAY);
+    $("status").textContent = "Chain! Picking up " + board[p] + " from hole " + (p + 1) + "…";
+    hand = board[p]; board[p] = 0; paint(p);
+  }
+  moves++; busy = false; paint(-1);
+  $("status").textContent = "Ended in an empty hole. Your turn.";
+}
+
+/* ---------- solver UI ---------- */
+function showSolution(path) {
+  const info = $("outInfo"), list = $("outList");
+  list.innerHTML = "";
+  if (!path.length) { info.textContent = "Already solved."; }
+  else {
+    info.textContent = "Click these holes in order (numbered 1–8 clockwise from the top): " + path.length + " clicks. Each click starts from the board you have now.";
+    const li = document.createElement("li");
+    li.style.listStyle = "none";
+    li.textContent = path.map((x) => x + 1).join(" → ");
+    list.appendChild(li);
+  }
+  $("out").classList.remove("hidden");
+  $("play").classList.toggle("hidden", !path.length);
+  if (path.length) holes[path[0]].classList.add("hint");
+}
+$("solve").addEventListener("click", () => {
+  if (busy || solving) return;
+  if (done) { $("status").textContent = "Already solved. Press Restart."; return; }
+  solving = true; paint(-1); $("status").textContent = "Searching…"; $("solve").disabled = true;
+  setTimeout(() => {
+    const t = performance.now();
+    const r = dfsSolve(board.slice(), 3000000);
+    const ms = Math.round(performance.now() - t);
+    solving = false; $("solve").disabled = false; paint(-1);
+    if (r.path) {
+      solution = r.path; showSolution(r.path);
+      $("status").textContent = "Solved in " + ms + " ms by depth-first search.";
+    } else {
+      $("out").classList.remove("hidden"); $("play").classList.add("hidden"); $("outList").innerHTML = "";
+      $("outInfo").textContent = r.none
+        ? "No winning sequence exists from this board (every reachable position was searched)."
+        : "No solution found within the search limit (" + r.nodes + " positions tried). That does not prove there is none.";
+      $("status").textContent = "";
+    }
+  }, 30);
+});
+$("play").addEventListener("click", async () => {
+  if (!solution || busy) return;
+  stopAuto = false; const path = solution.slice();
+  $("play").classList.add("hidden");
+  for (const i of path) {
+    if (stopAuto || done) break;
+    await play(i);
+    await sleep(150);
+  }
+});
+$("reset").addEventListener("click", () => reset());
+
+/* ---------- start ---------- */
+[4, 5, 6, 7].forEach((n) => {
+  const b = document.createElement("button"); b.type = "button"; b.dataset.n = n; b.textContent = n;
+  b.addEventListener("click", () => reset(n));
+  $("cfg").appendChild(b);
+});
+build(); reset(4);
+window.__sow = { simulate, dfsSolve, state: () => ({ board, moves, done }) };
+</script>
+</body>
+</html>
