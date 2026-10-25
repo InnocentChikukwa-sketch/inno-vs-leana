@@ -449,7 +449,7 @@ h2{font-family:var(--display);font-weight:800;font-variation-settings:"wdth" 75;
     if("IntersectionObserver" in window){ const io=new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)){ setTimeout(open,150); io.disconnect(); } },{threshold:.4}); io.observe(fan); } else open(); }
 
   // pick up new versions, like the games do
-  const BUILD="20261025-1040";
+  const BUILD="20261025-1100";
   async function check(){
     if(!/^https?:$/.test(location.protocol)) return;
     if(document.activeElement&&/INPUT/.test(document.activeElement.tagName)) return;
