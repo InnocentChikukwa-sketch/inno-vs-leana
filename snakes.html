@@ -443,7 +443,7 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ hiddenN
 if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").then(r=>{ swReg=r; }).catch(()=>{});
 
 /* ---------- self-update (same as the other games) ---------- */
-const BUILD="20261025-1100"; let updating=false;
+const BUILD="20261025-1115"; let updating=false;
 function reloadWhenSafe(b){ const key="upd-"+location.pathname+"-"+b; try{ if(sessionStorage.getItem(key)) return; sessionStorage.setItem(key,"1"); }catch(e){}
   const go=()=>location.replace(location.pathname+"?v="+encodeURIComponent(b)); if(!rolling&&!animating) return go(); const t=setInterval(()=>{ if(!rolling&&!animating){ clearInterval(t); go(); } },3000); }
 async function checkUpdate(){ if(updating||!/^https?:$/.test(location.protocol)) return; try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return; const j=await r.json(); if(j&&j.build&&j.build!==BUILD){ updating=true; reloadWhenSafe(j.build); } }catch(e){} }

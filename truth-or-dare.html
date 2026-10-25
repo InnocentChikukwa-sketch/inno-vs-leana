@@ -659,7 +659,7 @@ if("serviceWorker" in navigator && location.protocol==="https:"){
 
 
 /* ---------- self-update: when a new version is published, reload onto it (the game itself is saved, so nothing is lost) ---------- */
-const BUILD="20261025-1100";
+const BUILD="20261025-1115";
 let updating=false;
 function reloadWhenSafe(b){
   const key="upd-"+location.pathname+"-"+b; try{ if(sessionStorage.getItem(key)) return; sessionStorage.setItem(key,"1"); }catch(e){}
