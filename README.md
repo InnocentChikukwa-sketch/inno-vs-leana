@@ -1,7 +1,7 @@
 # Inno vs Leana
 
-Games for two phones.
+Games for two phones: https://inno-vs-leana.onrender.com/
 
-- Truth or Dare: https://inno-vs-leana.onrender.com/
-- ZIM8 (cards): https://inno-vs-leana.onrender.com/lastcard.html
-- Tsoro Yematatu: https://inno-vs-leana.onrender.com/tsoro.html
+- Truth or Dare: truth-or-dare.html
+- ZIM8 (cards): lastcard.html
+- Tsoro Yematatu: tsoro.html

@@ -441,7 +441,7 @@ function lobbyView(s){
   return `<div class="panel"><h2>Tsoro Yematatu</h2><p>The three-stone game from Zimbabwe.</p>${rulesList()}
     <p style="font-size:14px">${NAMES[s.next||"inno"]} places first. Either of you can start.</p>
     <button class="btn" data-act="start">Start game</button></div>
-    <div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">switch</button></span><span><a class="link" href="lastcard.html">ZIM8</a> · <a class="link" href="./">Truth or Dare</a></span></div>`;
+    <div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">switch</button> · <a class="link" href="./">All games</a></span><span><a class="link" href="lastcard.html">ZIM8</a> · <a class="link" href="truth-or-dare.html">Truth or Dare</a></span></div>`;
 }
 function tableView(s){
   const myTurn=s.turn===me, o=other(me);
@@ -464,8 +464,8 @@ function tableView(s){
   const recent=s.log.slice(-4).reverse();
   const foot=confirmEnd
     ? `<div class="confirm"><span>Stop this game? Nobody gets a win.</span><div class="row"><button class="btn ghost" data-act="endno">Keep playing</button><button class="btn warn" data-act="endyes">Stop game</button></div></div>`
-    : `<div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">switch</button> · <button class="link" data-act="rules">rules</button></span>
-        <span>${s.phase==="move"&&!s.drawOffer?`<button class="link" data-act="drawoffer">Offer draw</button> · `:""}${s.phase!=="over"?`<button class="link" data-act="end">Stop game</button>`:`<a class="link" href="lastcard.html">ZIM8</a> · <a class="link" href="./">Truth or Dare</a>`}</span></div>`;
+    : `<div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">switch</button> · <a class="link" href="./">All games</a> · <button class="link" data-act="rules">rules</button></span>
+        <span>${s.phase==="move"&&!s.drawOffer?`<button class="link" data-act="drawoffer">Offer draw</button> · `:""}${s.phase!=="over"?`<button class="link" data-act="end">Stop game</button>`:`<a class="link" href="lastcard.html">ZIM8</a> · <a class="link" href="truth-or-dare.html">Truth or Dare</a>`}</span></div>`;
   return `${phase}${status}${flash?`<div class="flash">${esc(flash)}</div>`:""}${boardSVG(s)}${extra}
     ${recent.length?`<div class="log">${recent.map(l=>`<div>${esc(l.text)}</div>`).join("")}</div>`:""}${foot}`;
 }
@@ -498,7 +498,7 @@ if("serviceWorker" in navigator && location.protocol==="https:"){
 }
 
 /* ---------- self-update (same as the other games) ---------- */
-const BUILD="20261025-0800";
+const BUILD="20261025-0820";
 let updating=false;
 function reloadWhenSafe(b){
   const key="upd-"+location.pathname+"-"+b; try{ if(sessionStorage.getItem(key)) return; sessionStorage.setItem(key,"1"); }catch(e){}

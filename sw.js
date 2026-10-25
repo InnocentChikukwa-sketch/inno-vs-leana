@@ -6,7 +6,7 @@ self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   const data = e.notification.data || {};
   const tab = data.tab;
-  const url = data.url; // set by Last Card so the tap opens that game, not Truth or Dare
+  const url = data.url; // each game puts its own address here so the tap opens that game
   e.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       const same = url
@@ -18,7 +18,7 @@ self.addEventListener("notificationclick", (e) => {
           return c.focus();
         }
       }
-      return self.clients.openWindow(url || "./");
+      return self.clients.openWindow(url || "truth-or-dare.html");
     })
   );
 });
