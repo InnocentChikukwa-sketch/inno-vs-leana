@@ -7,19 +7,24 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body{background:#FFD200;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  .board{position:relative;width:min(92vw,440px);aspect-ratio:1;margin:0 auto;border-radius:50%;background:radial-gradient(circle at 50% 40%,#8a5a2b,#5b3716);box-shadow:0 8px 0 rgba(0,0,0,.85),inset 0 0 40px rgba(0,0,0,.45)}
-  .hole{position:absolute;width:22%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);border:0;cursor:pointer;
-    background:radial-gradient(circle at 50% 35%,#2b1807,#4a2c10);box-shadow:inset 0 6px 12px rgba(0,0,0,.7);color:#fff;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;transition:transform .12s,box-shadow .12s,outline-color .12s;outline:4px solid transparent}
-  .hole .n{font-size:clamp(20px,6.5vw,30px);font-weight:800;line-height:1}
-  .hole .i{position:absolute;top:-2px;left:50%;transform:translate(-50%,-100%);font-size:11px;font-weight:700;color:#FFD200;opacity:.85}
+  .stone{position:relative;border-radius:22px;padding:14px 12px;background:linear-gradient(135deg,#8d8a86,#6e6b67 55%,#807d79);box-shadow:0 8px 0 rgba(0,0,0,.85),inset 0 0 30px rgba(0,0,0,.35)}
+  .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:clamp(4px,1.4vw,9px)}
+  .line{height:6px;border-radius:3px;margin:10px 0;background:#1d1b19;box-shadow:0 1px 0 rgba(255,255,255,.25)}
+  .tag{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);margin:0 2px 6px;display:flex;justify-content:space-between}
+  .hole{position:relative;aspect-ratio:1;border-radius:50%;border:0;padding:0;cursor:pointer;
+    background:radial-gradient(circle at 50% 30%,#2a2623,#4a443f 70%,#5a534d);box-shadow:inset 0 5px 9px rgba(0,0,0,.75),0 1px 0 rgba(255,255,255,.18);
+    outline:3px solid transparent;transition:outline-color .12s,box-shadow .12s,transform .12s}
   .hole:disabled{cursor:default}
-  .hole:not(:disabled):hover{transform:translate(-50%,-50%) scale(1.05)}
-  .hole.active{outline-color:#FFD200;box-shadow:inset 0 6px 12px rgba(0,0,0,.7),0 0 0 6px rgba(255,210,0,.35),0 0 22px 6px #FFD200}
-  .hole.drop{animation:pop .3s ease-out}
+  .hole:not(:disabled):hover{transform:scale(1.06)}
+  .hole.active{outline-color:#FFD200;box-shadow:inset 0 5px 9px rgba(0,0,0,.75),0 0 0 4px rgba(255,210,0,.4),0 0 16px 4px #FFD200}
   .hole.hint{outline-color:#27d17f}
-  .hole.empty .n{opacity:.35}
-  @keyframes pop{0%{transform:translate(-50%,-50%) scale(1.18)}100%{transform:translate(-50%,-50%) scale(1)}}
+  .hole.drop{animation:pop .3s ease-out}
+  .hole.done{box-shadow:inset 0 5px 9px rgba(0,0,0,.75),0 0 0 3px #27d17f}
+  .ball{position:absolute;border-radius:50%;transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 35% 30%,#fff5d8,#d9a35a 55%,#8a5a26);box-shadow:0 1px 2px rgba(0,0,0,.6)}
+  .num{position:absolute;right:-1px;bottom:-1px;min-width:1.35em;padding:0 .25em;border-radius:999px;background:#000;color:#FFD200;font-size:clamp(9px,2.6vw,12px);font-weight:800;line-height:1.5;text-align:center}
+  .idx{position:absolute;left:3px;top:1px;font-size:clamp(7px,2vw,10px);font-weight:700;color:rgba(255,255,255,.55)}
+  @keyframes pop{0%{transform:scale(1.18)}100%{transform:scale(1)}}
   .btn{font-weight:800;border-radius:999px;padding:.7rem 1.2rem;border:2px solid #000;box-shadow:0 4px 0 #000;transition:transform .08s,box-shadow .08s}
   .btn:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 #000}
   .btn:disabled{opacity:.5}
@@ -27,22 +32,22 @@
 </style>
 </head>
 <body class="min-h-screen text-black">
-<main class="max-w-xl mx-auto px-4 py-5">
-  <div class="flex items-center justify-between mb-3">
+<main class="max-w-xl mx-auto px-3 py-5">
+  <div class="flex items-center justify-between mb-3 px-1">
     <a href="./" class="font-bold underline">&larr; All games</a>
     <span class="text-sm font-bold">Moves: <span id="moves">0</span></span>
   </div>
-  <h1 class="text-3xl font-extrabold tracking-tight">Tsoro yemakomba</h1>
-  <p class="mt-1 text-sm font-medium">Tap a hole. Its seeds are sown clockwise. If your last seed lands in a hole that already has seeds, pick them all up and keep sowing. Stop when the last seed lands in an empty hole. <b>Win by getting every seed into one hole.</b></p>
+  <h1 class="text-3xl font-extrabold tracking-tight px-1">Tsoro yemakomba</h1>
+  <p class="mt-1 text-sm font-medium px-1">Each side of the line is 2 rows &times; 8 holes and is its own puzzle. Tap a hole to pick up its balls; they drop one by one around that side (clockwise, the small numbers show the order). If your last ball lands in a hole that already has balls, pick them all up and keep going. Stop when it lands in an empty hole. <b>Gather every ball of a side into one hole to win that side.</b></p>
 
-  <div class="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Seeds per hole">
-    <span class="font-bold text-sm">Seeds per hole:</span>
+  <div class="mt-3 flex flex-wrap items-center gap-2 px-1" role="group" aria-label="Balls per hole">
+    <span class="font-bold text-sm">Balls per hole:</span>
     <div id="cfg" class="flex gap-2"></div>
   </div>
 
-  <div class="my-5"><div id="board" class="board" aria-label="Circular board of 8 holes"></div></div>
+  <div class="stone mt-4" id="stone" aria-label="Board: 4 rows by 8 columns, split by a line into two sides"></div>
 
-  <p id="status" class="text-center font-bold min-h-[1.5rem]" aria-live="polite"></p>
+  <p id="status" class="text-center font-bold min-h-[1.5rem] mt-4" aria-live="polite"></p>
 
   <div class="mt-3 flex flex-wrap justify-center gap-3">
     <button id="reset" class="btn bg-white">Restart</button>
@@ -52,166 +57,203 @@
 
   <section id="out" class="mt-5 hidden bg-white/80 border-2 border-black rounded-2xl p-4">
     <h2 class="font-extrabold">Solution for this board</h2>
-    <p id="outInfo" class="text-sm mt-1"></p>
-    <ol id="outList" class="mt-2 text-sm font-mono leading-6 max-h-56 overflow-auto break-words"></ol>
+    <div id="outBody" class="text-sm mt-1"></div>
   </section>
 </main>
 
 <script>
 "use strict";
-const N = 8;
+const L = 16;                            // holes in one side's loop (2 rows x 8)
+const DELAY = 300;                       // ms between ball drops
 const $ = (id) => document.getElementById(id);
-const DELAY = 300;                       // ms between seed drops
-let seeds = 4, board = [], total = 0, busy = false, moves = 0, done = false, solution = null, solving = false, stopAuto = false;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let per = 4, sides = [], moves = 0, busy = false, solving = false, stopAuto = false, solutions = null;
+const NAME = ["Top side", "Bottom side"];
 
-/* ---------- pure engine (shared by the game and the solver) ---------- */
-// Plays hole i on array b. Returns { b, win } or { loop:true } if the sowing would never stop.
+/* where loop position i sits on the grid; the loop runs clockwise round its own side */
+function cell(side, i) {
+  if (side === 0) return i < 8 ? { r: 1, c: 7 - i } : { r: 0, c: i - 8 };
+  return i < 8 ? { r: 2, c: i } : { r: 3, c: 15 - i };
+}
+
+/* ---------- pure engine ---------- */
 function simulate(b, i, tot) {
   b = b.slice();
   let hand = b[i], p = i, laps = 0; b[i] = 0;
   while (true) {
-    while (hand > 0) { p = (p + 1) % N; b[p]++; hand--; }
+    while (hand > 0) { p = (p + 1) % L; b[p]++; hand--; }
     if (b[p] === tot) return { b, win: true };
-    if (b[p] === 1) return { b, win: false };      // landed in an empty hole: turn over
+    if (b[p] === 1) return { b, win: false };       // landed in an empty hole: turn ends
     if (++laps > 500) return { loop: true };
-    hand = b[p]; b[p] = 0;                          // chain reaction
+    hand = b[p]; b[p] = 0;                           // chain reaction
   }
 }
-
-/* Depth-first search with backtracking and a visited set.
-   Returns an array of hole indexes (0-7) or null; { limit:true } when the budget runs out. */
-function dfsSolve(start, maxNodes) {
+/* Best-first backtracking search: always expand the most promising position next
+   (balls piling up), keep a visited set, and back up to the next best branch when stuck. */
+function solveSearch(start, maxNodes, maxMs) {
   const tot = start.reduce((a, c) => a + c, 0);
   if (start.some((v) => v === tot)) return { path: [] };
-  const seen = new Set([start.join()]);
-  const stack = [{ b: start, next: 0 }], path = [];
-  let nodes = 0;
-  while (stack.length) {
-    const f = stack[stack.length - 1];
-    if (f.next >= N) { stack.pop(); path.pop(); continue; }   // backtrack
-    const i = f.next++;
-    if (!f.b[i]) continue;
-    const r = simulate(f.b, i, tot);
-    if (r.loop) continue;
-    if (r.win) return { path: path.concat(i), nodes };
-    const k = r.b.join();
-    if (seen.has(k)) continue;
-    seen.add(k);
-    if (++nodes > maxNodes) return { limit: true, nodes };
-    stack.push({ b: r.b, next: 0 }); path.push(i);
+  const score = (b) => { let s = 0; for (const v of b) s += v * v; return s; };
+  const H = [];
+  const push = (x) => { H.push(x); let i = H.length - 1; while (i) { const p = (i - 1) >> 1; if (H[p].s >= H[i].s) break; [H[p], H[i]] = [H[i], H[p]]; i = p; } };
+  const pop = () => { const t = H[0], l = H.pop(); if (H.length) { H[0] = l; let i = 0; for (;;) { const a = 2 * i + 1, c = a + 1; let m = i; if (a < H.length && H[a].s > H[m].s) m = a; if (c < H.length && H[c].s > H[m].s) m = c; if (m === i) break; [H[m], H[i]] = [H[i], H[m]]; i = m; } } return t; };
+  const k0 = start.join(), seen = new Map([[k0, null]]); push({ b: start, s: score(start), k: k0 });
+  const t0 = performance.now(); let nodes = 0;
+  while (H.length) {
+    const x = pop();
+    for (let i = 0; i < L; i++) {
+      if (!x.b[i]) continue;
+      const r = simulate(x.b, i, tot);
+      if (r.loop) continue;
+      if (r.win) { const path = [i]; let k = x.k; while (seen.get(k)) { const q = seen.get(k); path.push(q.i); k = q.k; } return { path: path.reverse(), nodes }; }
+      const k = r.b.join();
+      if (seen.has(k)) continue;
+      seen.set(k, { k: x.k, i }); push({ b: r.b, s: score(r.b), k });
+      if (++nodes > maxNodes || (nodes % 4000 === 0 && performance.now() - t0 > maxMs)) return { limit: true, nodes };
+    }
   }
   return { none: true, nodes };
 }
 
-/* ---------- board drawing ---------- */
-const holes = [];
+/* ---------- drawing ---------- */
+const els = [[], []];                    // els[side][i] = { btn, balls, num }
 function build() {
-  const el = $("board"); el.innerHTML = ""; holes.length = 0;
-  for (let i = 0; i < N; i++) {
-    const ang = (-90 + i * 45) * Math.PI / 180;       // hole 1 at the top, clockwise
-    const b = document.createElement("button");
-    b.className = "hole"; b.type = "button";
-    b.style.left = (50 + 37 * Math.cos(ang)) + "%"; b.style.top = (50 + 37 * Math.sin(ang)) + "%";
-    b.innerHTML = '<span class="i">' + (i + 1) + '</span><span class="n"></span>';
-    b.addEventListener("click", () => play(i));
-    el.appendChild(b); holes.push(b);
-  }
+  const stone = $("stone"); stone.innerHTML = ""; els[0] = []; els[1] = [];
+  const mk = (side) => {
+    const wrap = document.createElement("div");
+    const tag = document.createElement("div"); tag.className = "tag"; tag.innerHTML = "<span>" + NAME[side] + "</span><span id='st" + side + "'></span>";
+    const g = document.createElement("div"); g.className = "grid";
+    const cells = Array(16).fill(null);
+    for (let i = 0; i < L; i++) { const { r, c } = cell(side, i); cells[(r - side * 2) * 8 + c] = i; }
+    for (const i of cells) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "hole";
+      b.innerHTML = '<span class="idx">' + (i + 1) + '</span><span class="num"></span>';
+      b.addEventListener("click", () => play(side, i));
+      g.appendChild(b); els[side][i] = { btn: b, num: b.querySelector(".num"), n: -1 };
+    }
+    if (side === 0) { wrap.appendChild(tag); wrap.appendChild(g); } else { wrap.appendChild(g); wrap.appendChild(tag); tag.style.margin = "6px 2px 0"; }
+    return wrap;
+  };
+  const d = document.createElement("div"); d.className = "line"; d.setAttribute("aria-hidden", "true");
+  stone.append(mk(0), d, mk(1));
 }
-function paint(active) {
-  holes.forEach((h, i) => {
-    h.querySelector(".n").textContent = board[i];
-    h.classList.toggle("active", i === active);
-    h.classList.toggle("empty", board[i] === 0);
-    h.disabled = busy || done || solving || board[i] === 0;
-    h.setAttribute("aria-label", "Hole " + (i + 1) + ", " + board[i] + " seeds");
-    h.classList.remove("hint");
-  });
+function drawBalls(e, n) {
+  if (e.n === n) return; e.n = n;
+  e.btn.querySelectorAll(".ball").forEach((x) => x.remove());
+  const shown = Math.min(n, 60);
+  const size = shown <= 4 ? 24 : shown <= 9 ? 19 : shown <= 20 ? 14 : shown <= 36 ? 11 : 9;   // % of the hole
+  const R = 40;                                                                              // % radius available
+  for (let k = 0; k < shown; k++) {
+    let x = 50, y = 50;
+    if (shown > 1) {                                  // sunflower layout inside the hole
+      const rr = R * Math.sqrt((k + 0.5) / shown) * (shown <= 4 ? 0.62 : 0.9), a = k * 2.399963 + 0.6;
+      x = 50 + rr * Math.cos(a); y = 50 + rr * Math.sin(a);
+    }
+    const b = document.createElement("i"); b.className = "ball";
+    b.style.cssText = "left:" + x + "%;top:" + y + "%;width:" + size + "%;height:" + size + "%";
+    e.btn.insertBefore(b, e.num);
+  }
+  e.num.textContent = n; e.num.style.display = n ? "" : "none";
+}
+function paint(activeSide, active) {
+  for (let s = 0; s < 2; s++) {
+    const S = sides[s];
+    for (let i = 0; i < L; i++) {
+      const e = els[s][i];
+      drawBalls(e, S.b[i]);
+      e.btn.classList.toggle("active", s === activeSide && i === active);
+      e.btn.classList.toggle("done", S.done && S.b[i] > 0);
+      e.btn.disabled = busy || solving || S.done || S.b[i] === 0;
+      e.btn.classList.remove("hint");
+      e.btn.setAttribute("aria-label", NAME[s] + " hole " + (i + 1) + ", " + S.b[i] + " balls");
+    }
+    $("st" + s).textContent = S.done ? "✓ solved" : "";
+  }
   $("moves").textContent = moves;
 }
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
 function reset(n) {
-  if (n) seeds = n;
-  stopAuto = true;
-  board = Array(N).fill(seeds); total = N * seeds; moves = 0; done = false; busy = false; solution = null;
+  if (n) per = n;
+  stopAuto = true; busy = false; moves = 0; solutions = null;
+  sides = [0, 1].map(() => ({ b: Array(L).fill(per), done: false }));
   $("out").classList.add("hidden"); $("play").classList.add("hidden");
   $("status").textContent = "Pick a hole to start.";
   document.querySelectorAll("#cfg button").forEach((b) => {
-    const on = +b.dataset.n === seeds;
+    const on = +b.dataset.n === per;
     b.className = "btn px-4 py-1 " + (on ? "bg-black text-yellow-300" : "bg-white");
     b.setAttribute("aria-pressed", on);
   });
-  paint(-1);
+  paint(-1, -1);
 }
 
-/* ---------- playing a move with animation ---------- */
-async function play(i) {
-  if (busy || done || !board[i]) return;
-  busy = true; solution = null; $("play").classList.add("hidden"); $("out").classList.add("hidden");
-  $("status").textContent = "";
-  let hand = board[i], p = i; board[i] = 0; paint(p);
+/* ---------- playing a move ---------- */
+async function play(s, i) {
+  const S = sides[s];
+  if (busy || S.done || !S.b[i]) return;
+  busy = true; solutions = null; $("play").classList.add("hidden"); $("out").classList.add("hidden"); $("status").textContent = "";
+  const tot = L * per;
+  let hand = S.b[i], p = i; S.b[i] = 0; paint(s, p);
   while (true) {
     while (hand > 0) {
       await sleep(DELAY);
-      p = (p + 1) % N; board[p]++; hand--;
-      paint(p); holes[p].classList.add("drop");
+      p = (p + 1) % L; S.b[p]++; hand--;
+      paint(s, p);
+      const bt = els[s][p].btn; bt.classList.remove("drop"); void bt.offsetWidth; bt.classList.add("drop");
     }
-    if (board[p] === total) { moves++; done = true; busy = false; paint(p); $("status").textContent = "You win in " + moves + " moves! All " + total + " seeds are in hole " + (p + 1) + "."; return; }
-    if (board[p] === 1) break;
+    if (S.b[p] === tot) {
+      moves++; S.done = true; busy = false; paint(-1, -1);
+      $("status").textContent = sides[0].done && sides[1].done ? "Both sides solved in " + moves + " moves!" : NAME[s] + " solved! All " + tot + " balls are in hole " + (p + 1) + ".";
+      return;
+    }
+    if (S.b[p] === 1) break;
     await sleep(DELAY);
-    $("status").textContent = "Chain! Picking up " + board[p] + " from hole " + (p + 1) + "…";
-    hand = board[p]; board[p] = 0; paint(p);
+    $("status").textContent = "Chain! Picking up " + S.b[p] + " from hole " + (p + 1) + "…";
+    hand = S.b[p]; S.b[p] = 0; paint(s, p);
   }
-  moves++; busy = false; paint(-1);
+  moves++; busy = false; paint(-1, -1);
   $("status").textContent = "Ended in an empty hole. Your turn.";
 }
 
-/* ---------- solver UI ---------- */
-function showSolution(path) {
-  const info = $("outInfo"), list = $("outList");
-  list.innerHTML = "";
-  if (!path.length) { info.textContent = "Already solved."; }
-  else {
-    info.textContent = "Click these holes in order (numbered 1–8 clockwise from the top): " + path.length + " clicks. Each click starts from the board you have now.";
-    const li = document.createElement("li");
-    li.style.listStyle = "none";
-    li.textContent = path.map((x) => x + 1).join(" → ");
-    list.appendChild(li);
-  }
-  $("out").classList.remove("hidden");
-  $("play").classList.toggle("hidden", !path.length);
-  if (path.length) holes[path[0]].classList.add("hint");
-}
+/* ---------- solver ---------- */
 $("solve").addEventListener("click", () => {
   if (busy || solving) return;
-  if (done) { $("status").textContent = "Already solved. Press Restart."; return; }
-  solving = true; paint(-1); $("status").textContent = "Searching…"; $("solve").disabled = true;
+  if (sides[0].done && sides[1].done) { $("status").textContent = "Both sides are already solved. Press Restart."; return; }
+  solving = true; paint(-1, -1); $("solve").disabled = true; $("status").textContent = "Searching…";
   setTimeout(() => {
     const t = performance.now();
-    const r = dfsSolve(board.slice(), 3000000);
+    const res = sides.map((S) => S.done ? { path: [] } : solveSearch(S.b.slice(), 2500000, 15000));
     const ms = Math.round(performance.now() - t);
-    solving = false; $("solve").disabled = false; paint(-1);
-    if (r.path) {
-      solution = r.path; showSolution(r.path);
-      $("status").textContent = "Solved in " + ms + " ms by depth-first search.";
-    } else {
-      $("out").classList.remove("hidden"); $("play").classList.add("hidden"); $("outList").innerHTML = "";
-      $("outInfo").textContent = r.none
-        ? "No winning sequence exists from this board (every reachable position was searched)."
-        : "No solution found within the search limit (" + r.nodes + " positions tried). That does not prove there is none.";
-      $("status").textContent = "";
-    }
+    solving = false; $("solve").disabled = false; paint(-1, -1);
+    solutions = res;
+    const body = $("outBody"); body.innerHTML = "";
+    let ok = true, any = false;
+    res.forEach((r, s) => {
+      const p = document.createElement("p"); p.className = "mt-2";
+      const h = document.createElement("b"); h.textContent = NAME[s] + ": ";
+      p.appendChild(h);
+      if (sides[s].done) p.append("already solved.");
+      else if (r.path) {
+        any = true;
+        p.append(r.path.length + " clicks, in this order (hole numbers as printed on the board):");
+        const o = document.createElement("div"); o.className = "font-mono leading-6 max-h-40 overflow-auto break-words mt-1";
+        o.textContent = r.path.map((x) => x + 1).join(" → "); p.appendChild(o);
+        if (r.path.length) els[s][r.path[0]].btn.classList.add("hint");
+      } else {
+        ok = false;
+        p.append(r.none ? "no winning sequence exists from this board (every reachable position was searched)."
+          : "no solution found within the search limit (" + r.nodes + " positions tried). That does not prove there is none.");
+      }
+      body.appendChild(p);
+    });
+    $("out").classList.remove("hidden");
+    $("play").classList.toggle("hidden", !(ok && any));
+    $("status").textContent = (ok ? "Solved" : "Search finished") + " in " + ms + " ms.";
   }, 30);
 });
 $("play").addEventListener("click", async () => {
-  if (!solution || busy) return;
-  stopAuto = false; const path = solution.slice();
+  if (!solutions || busy) return;
+  stopAuto = false; const plan = solutions.map((r) => (r.path || []).slice());
   $("play").classList.add("hidden");
-  for (const i of path) {
-    if (stopAuto || done) break;
-    await play(i);
-    await sleep(150);
-  }
+  for (let s = 0; s < 2; s++) for (const i of plan[s]) { if (stopAuto) return; await play(s, i); await sleep(150); }
 });
 $("reset").addEventListener("click", () => reset());
 
@@ -222,7 +264,7 @@ $("reset").addEventListener("click", () => reset());
   $("cfg").appendChild(b);
 });
 build(); reset(4);
-window.__sow = { simulate, dfsSolve, state: () => ({ board, moves, done }) };
+window.__sow = { simulate, solveSearch, L, state: () => ({ sides: sides.map((s) => s.b), moves, done: sides.map((s) => s.done) }) };
 </script>
 </body>
 </html>
