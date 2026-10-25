@@ -3,7 +3,7 @@
    and gives each game the private room it should use. */
 (function () {
   "use strict";
-  const DEFAULT_API = "https://game-room-api.onrender.com";
+  const DEFAULT_API = "https://game-room-api-4k6l.onrender.com";
   const get = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const set = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
   const getJ = (k) => { try { return JSON.parse(get(k) || "null"); } catch (e) { return null; } };
