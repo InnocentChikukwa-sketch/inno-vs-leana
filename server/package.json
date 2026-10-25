@@ -1,0 +1,10 @@
+{
+  "name": "game-room-accounts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Accounts, invites and private rooms for the two-phone games",
+  "main": "index.js",
+  "scripts": { "start": "node index.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "pg": "8.13.1" }
+}

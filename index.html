@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#FFD200">
-<title>Inno &amp; Leana · Game room</title>
-<meta name="description" content="Truth or Dare, ZIM8, Tsoro Yematatu and Two Spies for two phones.">
+<title>Game room · Games for two</title>
+<meta name="description" content="Truth or Dare, ZIM8, Tsoro Yematatu, Two Spies and Snakes and Ladders for couples, live on two phones.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Figtree:wght@400;500;600;700;800&display=swap">
 <style>
@@ -16,7 +16,7 @@
   --green:#0E6B3A;      /* ZIM8 felt */
   --black:#000000;      /* Tsoro, text */
   --white:#FFFFFF;
-  --blue:#3E8EDE;       /* Leana's stones */
+  --blue:#3E8EDE;       /* second player's stones */
   --display:"Bricolage Grotesque","Arial Narrow",system-ui,sans-serif;
   --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
   color-scheme:light;
@@ -42,6 +42,7 @@ h1{font-family:var(--display);font-weight:800;font-variation-settings:"wdth" 75;
 .band.zim{background:var(--green)}
 .band.tsoro{background:var(--black)}
 .band.spies{background:#1C3F8C}
+.band.snakes{background:#0F7F84}
 .band .wrap{display:grid;gap:22px;align-items:center}
 .art{display:flex;justify-content:center}
 .art svg{width:min(100%,360px);height:auto;display:block;overflow:visible}
@@ -78,14 +79,51 @@ h2{font-family:var(--display);font-weight:800;font-variation-settings:"wdth" 75;
 .fan.open .c2{transform:rotate(0deg) translateY(-8px)}
 .fan.open .c3{transform:rotate(24deg)}
 @media (prefers-reduced-motion:reduce){ .fan .c{transition:none} }
+
+/* account card in the hero */
+.acct{margin-top:30px;background:var(--white);border-radius:22px;padding:20px;max-width:440px;box-shadow:0 6px 0 rgba(0,0,0,.85)}
+.acct h3{font-family:var(--display);font-weight:800;font-variation-settings:"wdth" 85;font-size:26px;line-height:1.05;letter-spacing:-.01em;margin:0 0 4px}
+.acct .sub{margin:0 0 14px;font-size:15px;color:#3b3b3b}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#f1ecdc;border-radius:14px;padding:5px;margin-bottom:16px}
+.tabs button{font:inherit;font-weight:700;font-size:15px;border:0;border-radius:10px;padding:10px;background:transparent;color:#444;cursor:pointer}
+.tabs button[aria-selected=true]{background:var(--black);color:var(--sun)}
+.fld{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.fld label{font-weight:700;font-size:14px}
+.fld label small{font-weight:500;color:#666}
+.fld input{font:inherit;font-size:17px;padding:12px 14px;border-radius:12px;border:2px solid #d9d2bd;background:#fffdf6;color:#000}
+.fld input:focus-visible{outline:none;border-color:var(--black)}
+.fld .hint{font-size:13px;min-height:18px;color:#555}
+.fld .hint.ok{color:#0E6B3A;font-weight:700}.fld .hint.bad{color:#B3141B;font-weight:700}
+.go{width:100%;font:inherit;font-weight:800;font-size:18px;padding:15px;border:0;border-radius:999px;background:var(--black);color:var(--sun);cursor:pointer}
+.go:disabled{opacity:.55;cursor:default}
+.err{background:#fde3e1;color:#8c0f15;border-radius:12px;padding:10px 12px;font-size:14px;font-weight:600;margin-bottom:12px}
+.note{font-size:13px;color:#555;margin:10px 0 0}
+.wake{background:#fff4c2;border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:12px}
+.me-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:14px}
+.me-row b{font-family:var(--display);font-size:24px;font-variation-settings:"wdth" 85}
+.linkbtn{font:inherit;font-size:14px;background:none;border:0;padding:4px 0;text-decoration:underline;color:#333;cursor:pointer}
+.sect{font-weight:800;font-size:15px;margin:16px 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;font-weight:700;font-size:16px;border-radius:999px;padding:9px 14px;border:2px solid var(--black);background:var(--white);color:var(--black);cursor:pointer}
+.chip[aria-pressed=true]{background:var(--black);color:var(--sun)}
+.inv{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f6f1e1;border-radius:12px;padding:10px 12px;margin-bottom:8px;font-size:15px}
+.inv .acts{display:flex;gap:6px;flex:none}
+.sm{font:inherit;font-weight:800;font-size:14px;border:0;border-radius:999px;padding:8px 12px;cursor:pointer;background:var(--black);color:var(--sun)}
+.sm.ghost{background:transparent;color:#333;border:2px solid #cfc7ae}
+.invform{display:flex;gap:8px}
+.invform input{flex:1;min-width:0;font:inherit;font-size:16px;padding:11px 12px;border-radius:12px;border:2px solid #d9d2bd;background:#fffdf6}
+.invform input:focus-visible{outline:none;border-color:var(--black)}
+.ready{margin-top:14px;font-size:15px;font-weight:600}
+.play.off{opacity:.85}
 </style>
 </head>
 <body>
 
 <header class="hero wrap">
-  <div class="top"><span>Inno &amp; Leana</span><span class="hi" id="hi"></span></div>
+  <div class="top"><span>Game room</span><span class="hi" id="hi"></span></div>
   <h1>Game room</h1>
-  <p class="lede">Four games for the two of you, even when you're apart. Pick a game, then send the same link to your partner.</p>
+  <p class="lede">Games for two, even when you're apart. Make an account, invite your partner, and play live on your own phones.</p>
+  <section class="acct" id="acct" aria-live="polite"></section>
 </header>
 
 <main>
@@ -204,69 +242,192 @@ h2{font-family:var(--display);font-weight:800;font-variation-settings:"wdth" 75;
       </div>
     </div>
   </section>
+
+  <section class="band snakes" aria-labelledby="t-snakes">
+    <div class="wrap">
+      <div class="art" aria-hidden="true">
+        <svg viewBox="0 0 360 280">
+          <rect x="22" y="2" width="316" height="266" rx="14" fill="#fff"/>
+          <rect x="30" y="10" width="60" height="50" fill="#FBF3D0"/><rect x="90" y="10" width="60" height="50" fill="#FFFFFF"/><rect x="150" y="10" width="60" height="50" fill="#FBF3D0"/><rect x="210" y="10" width="60" height="50" fill="#FFFFFF"/><rect x="270" y="10" width="60" height="50" fill="#FBF3D0"/><rect x="30" y="60" width="60" height="50" fill="#FFFFFF"/><rect x="90" y="60" width="60" height="50" fill="#FBF3D0"/><rect x="150" y="60" width="60" height="50" fill="#FFFFFF"/><rect x="210" y="60" width="60" height="50" fill="#FBF3D0"/><rect x="270" y="60" width="60" height="50" fill="#FFFFFF"/><rect x="30" y="110" width="60" height="50" fill="#FBF3D0"/><rect x="90" y="110" width="60" height="50" fill="#FFFFFF"/><rect x="150" y="110" width="60" height="50" fill="#FBF3D0"/><rect x="210" y="110" width="60" height="50" fill="#FFFFFF"/><rect x="270" y="110" width="60" height="50" fill="#FBF3D0"/><rect x="30" y="160" width="60" height="50" fill="#FFFFFF"/><rect x="90" y="160" width="60" height="50" fill="#FBF3D0"/><rect x="150" y="160" width="60" height="50" fill="#FFFFFF"/><rect x="210" y="160" width="60" height="50" fill="#FBF3D0"/><rect x="270" y="160" width="60" height="50" fill="#FFFFFF"/><rect x="30" y="210" width="60" height="50" fill="#FBF3D0"/><rect x="90" y="210" width="60" height="50" fill="#FFFFFF"/><rect x="150" y="210" width="60" height="50" fill="#FBF3D0"/><rect x="210" y="210" width="60" height="50" fill="#FFFFFF"/><rect x="270" y="210" width="60" height="50" fill="#FBF3D0"/>
+          <path d="M30 10h300v250H30z M90 10v250M150 10v250M210 10v250M270 10v250M30 60h300M30 110h300M30 160h300M30 210h300" fill="none" stroke="#1d1a16" stroke-width="2"/>
+          <g stroke-linecap="round" fill="none">
+            <path d="M88 238L232 62M108 248L252 72" stroke="#167f84" stroke-width="9"/><path d="M88 238L232 62M108 248L252 72" stroke="#3BBFC4" stroke-width="5"/>
+            <path d="M104 216l18 10M124 192l18 10M144 168l18 10M164 144l18 10M184 120l18 10M204 96l18 10" stroke="#3BBFC4" stroke-width="5"/>
+            <path d="M282 40C230 90 330 130 270 170S180 200 160 236" stroke="#c8504e" stroke-width="15"/><path d="M282 40C230 90 330 130 270 170S180 200 160 236" stroke="#F28B87" stroke-width="11"/>
+          </g>
+          <ellipse cx="284" cy="36" rx="14" ry="11" fill="#F28B87" stroke="#c8504e" stroke-width="3"/><circle cx="279" cy="33" r="2.5" fill="#1d1a16"/><circle cx="289" cy="33" r="2.5" fill="#1d1a16"/>
+          <g transform="translate(62 222)"><path d="M-12 18h24l-5-12c5-3 6-8 6-12a10 10 0 0 0-20 0c0 4 1 9 6 12z" fill="#E5322D" stroke="#1d1a16" stroke-width="2"/></g>
+          <g transform="rotate(-12 312 238)"><rect x="288" y="214" width="48" height="48" rx="10" fill="#fff" stroke="#1d1a16" stroke-width="3"/><circle cx="300" cy="226" r="4.5" fill="#1d1a16"/><circle cx="312" cy="238" r="4.5" fill="#1d1a16"/><circle cx="324" cy="250" r="4.5" fill="#1d1a16"/></g>
+        </svg>
+      </div>
+      <div>
+        <h2 id="t-snakes">Snakes &amp; Ladders</h2>
+        <p class="desc">Roll the die and race to 100. Climb the ladders, dodge the snakes, roll a 6 to go again, and land on 100 exactly.</p>
+        <p class="status" id="s-snakes"></p>
+        <a class="play" href="snakes.html">Play Snakes &amp; Ladders</a>
+      </div>
+    </div>
+  </section>
 </main>
 
 <footer class="how wrap" aria-labelledby="t-how">
   <h3 id="t-how">How to start a game</h3>
   <ol>
-    <li><span>Open a game on your phone.</span></li>
-    <li><span>Tap your name. Inno or Leana, it remembers you after that.</span></li>
-    <li><span>Send the same link to the other person on WhatsApp, and play.</span></li>
+    <li><span>Create an account with a username only you have.</span></li>
+    <li><span>Invite your partner by their username. They accept on their phone.</span></li>
+    <li><span>Both of you open the same game and play. Only the two of you can see it.</span></li>
   </ol>
-  <p class="small">Games save on your phone and update by themselves. Open links in Chrome rather than WhatsApp's own browser.</p>
+  <p class="small">You stay signed in on your phone, so you only do this once. Games save and update by themselves. Open the site in Chrome rather than WhatsApp's own browser.</p>
 </footer>
 
+<script src="account.js"></script>
 <script>
 (function(){
   "use strict";
-  const N={inno:"Inno",leana:"Leana"};
+  const $=id=>document.getElementById(id);
+  const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const J=k=>{ try{ return JSON.parse(localStorage.getItem(k)||"null"); }catch(e){ return null; } };
-  const get=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
-  const me=[get("ts.me"),get("lc.me"),get("tod.me")].find(v=>v==="inno"||v==="leana")||null;
-  const set=(id,html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
-  const w=(n)=>`${n} win${n===1?"":"s"}`;
+  const acct=$("acct");
+  let mode="signup", busy=false, err="", wake=false, avail=null, availTimer=null, keepUser="";
 
-  if(me) document.getElementById("hi").textContent=`Hi ${N[me]}`;
+  /* ---------- account card ---------- */
+  function slow(){ wake=true; render(); }
+  function render(){
+    const s=GR.session(), m=GR.me();
+    $("hi").textContent = s ? `Hi ${s.username}` : "";
+    if(!s){ acct.innerHTML=authView(); const u=$("u"); if(u&&keepUser) u.value=keepUser; }
+    else acct.innerHTML=homeView(s,m||{partners:[],invites:{incoming:[],outgoing:[]}});
+    statuses(); playButtons();
+  }
+  function authView(){
+    const up=mode==="signup";
+    return `<div class="tabs" role="tablist">
+        <button role="tab" data-mode="signup" aria-selected="${up}">Create account</button>
+        <button role="tab" data-mode="login" aria-selected="${!up}">Log in</button></div>
+      ${wake?`<div class="wake">Waking up the server. The first time after a quiet spell this can take up to a minute.</div>`:""}
+      ${err?`<div class="err" role="alert">${esc(err)}</div>`:""}
+      <form id="authform" autocomplete="on" novalidate>
+        <div class="fld"><label for="u">Username</label>
+          <input id="u" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20" required>
+          ${up?`<span class="hint ${avail?avail.cls:""}" id="uhint">${avail?esc(avail.text):"3 to 20 letters or numbers. Nobody else can have it."}</span>`:""}</div>
+        <div class="fld"><label for="p">Password</label>
+          <input id="p" name="password" type="password" autocomplete="${up?"new-password":"current-password"}" minlength="6" required>
+          ${up?`<span class="hint">At least 6 characters. Your phone can save it for you.</span>`:""}</div>
+        ${up?`<div class="fld"><label for="e">Email <small>(optional)</small></label>
+          <input id="e" name="email" type="email" autocomplete="email" inputmode="email">
+          <span class="hint">We'll email you your username so you don't forget it.</span></div>`:""}
+        <button class="go" type="submit" ${busy?"disabled":""}>${busy?(up?"Creating account…":"Logging in…"):(up?"Create account":"Log in")}</button>
+      </form>
+      <p class="note">You stay signed in on this phone, so you only need to do this once.</p>`;
+  }
+  function homeView(s,m){
+    const partners=m.partners||[], inc=(m.invites&&m.invites.incoming)||[], out=(m.invites&&m.invites.outgoing)||[];
+    const c=GR.couple();
+    return `<div class="me-row"><b>${esc(s.username)}</b><button class="linkbtn" data-act="logout">Log out</button></div>
+      ${wake?`<div class="wake">Waking up the server. This can take up to a minute.</div>`:""}
+      ${err?`<div class="err" role="alert">${esc(err)}</div>`:""}
+      ${inc.length?`<div class="sect">Invites for you</div>${inc.map(u=>`<div class="inv"><span><b>${esc(u)}</b> wants to play with you</span><span class="acts">
+        <button class="sm" data-act="accept" data-u="${esc(u)}">Accept</button><button class="sm ghost" data-act="decline" data-u="${esc(u)}">No</button></span></div>`).join("")}`:""}
+      ${partners.length?`<div class="sect">${partners.length>1?"Play with":"Your partner"}</div>
+        <div class="chips">${partners.map(p=>`<button class="chip" data-act="pick" data-u="${esc(p.username)}" aria-pressed="${!!c&&c.partner===p.username}">${esc(p.username)}</button>`).join("")}</div>
+        <p class="ready">${c?`You're playing with <b>${esc(c.partner)}</b>. Pick a game below.`:""}</p>`:""}
+      ${out.length?`<div class="sect">Waiting for</div>${out.map(u=>`<div class="inv"><span><b>${esc(u)}</b> hasn't accepted yet</span><span class="acts"><button class="sm ghost" data-act="cancel" data-u="${esc(u)}">Cancel</button></span></div>`).join("")}`:""}
+      <div class="sect">${partners.length?"Invite someone else":"Invite your partner"}</div>
+      <form class="invform" id="invform" autocomplete="off"><input id="iu" placeholder="Their username" aria-label="Partner's username" autocapitalize="off" spellcheck="false" maxlength="20">
+        <button class="sm" type="submit" ${busy?"disabled":""}>Invite</button></form>
+      ${!partners.length?`<p class="note">Ask your partner to create an account, then type their username here. They'll see your invite when they open Game room.</p>`:""}`;
+  }
+  async function run(fn){
+    if(busy) return; busy=true; err=""; wake=false; render();
+    try{ await fn(); }catch(e){ err=e.message||"Something went wrong."; }
+    busy=false; wake=false; render();
+  }
+  acct.addEventListener("click",e=>{
+    const t=e.target.closest("[data-mode]"); if(t){ mode=t.dataset.mode; err=""; avail=null; render(); return; }
+    const b=e.target.closest("[data-act]"); if(!b) return;
+    const u=b.dataset.u, act=b.dataset.act;
+    if(act==="logout") return run(()=>GR.logout());
+    if(act==="pick"){ GR.choosePartner(u); render(); return; }
+    if(act==="accept") return run(async()=>{ await GR.respond(u,true,{onSlow:slow}); GR.choosePartner(u); });
+    if(act==="decline") return run(()=>GR.respond(u,false,{onSlow:slow}));
+    if(act==="cancel") return run(()=>GR.cancel(u,{onSlow:slow}));
+  });
+  acct.addEventListener("input",e=>{
+    if(e.target.id==="u"){ keepUser=e.target.value; if(mode!=="signup") return;
+      clearTimeout(availTimer); const v=e.target.value.trim(); const h=$("uhint");
+      if(v.length<3){ avail=null; if(h){ h.className="hint"; h.textContent="3 to 20 letters or numbers. Nobody else can have it."; } return; }
+      availTimer=setTimeout(async()=>{
+        try{ const r=await GR.available(v); avail=r.available?{cls:"ok",text:`${v} is free.`}:{cls:"bad",text:r.reason};
+        }catch(x){ avail=null; }
+        const hh=$("uhint"); if(hh&&avail&&($("u")||{}).value.trim()===v){ hh.className="hint "+avail.cls; hh.textContent=avail.text; }
+      },400);
+    }
+  });
+  acct.addEventListener("submit",e=>{
+    e.preventDefault();
+    if(e.target.id==="authform"){
+      const username=$("u").value.trim(), password=$("p").value, email=($("e")||{}).value||"";
+      keepUser=username;
+      if(!username||!password){ err="Fill in your username and password."; render(); return; }
+      run(async()=>{
+        const d = mode==="signup" ? await GR.register({username,password,email},{onSlow:slow}) : await GR.login({username,password},{onSlow:slow});
+        keepUser=""; avail=null;
+        if(d.partners&&d.partners[0]&&!GR.couple()) GR.choosePartner(d.partners[0].username);
+      });
+    }
+    if(e.target.id==="invform"){
+      const u=$("iu").value.trim(); if(!u) return;
+      run(async()=>{ const d=await GR.invite(u,{onSlow:slow}); if(d.paired) GR.choosePartner(d.paired); });
+    }
+  });
 
-  // Truth or Dare: points within the current game
-  const t=J("tod.state");
-  if(t&&t.v>0&&t.scores){
-    const sc=`Inno <b>${t.scores.inno||0}</b>, Leana <b>${t.scores.leana||0}</b>`;
-    set("s-tod", t.phase==="over" ? `Last game ended ${sc}.` : `Round ${t.round||1} is waiting for you. Points so far: ${sc}.`);
+  /* ---------- game bands: play buttons and saved scores for this couple ---------- */
+  function playButtons(){
+    const c=GR.couple();
+    document.querySelectorAll("a.play").forEach(a=>{
+      a.classList.toggle("off",!c);
+      a.onclick = c ? null : (ev=>{ ev.preventDefault(); err = GR.session() ? "Invite your partner first. Once they accept, you can both play." : "Create an account or log in first."; render(); acct.scrollIntoView({behavior:"smooth",block:"center"}); });
+    });
   }
-  // ZIM8: wins across games
-  const z=J("lc.state");
-  if(z&&z.v>0&&z.wins){
-    const sc=`Inno <b>${w(z.wins.inno||0)}</b>, Leana <b>${w(z.wins.leana||0)}</b>.`;
-    set("s-zim", z.phase==="play" ? `A game is in progress. ${sc}` : sc);
-  }
-  // Tsoro: wins and draws
-  const s=J("ts.state");
-  if(s&&s.v>0&&s.wins){
-    const d=s.wins.draws?` ${s.wins.draws} draw${s.wins.draws===1?"":"s"}.`:"";
-    const sc=`Inno <b>${w(s.wins.inno||0)}</b>, Leana <b>${w(s.wins.leana||0)}</b>.${d}`;
-    set("s-tsoro", (s.phase==="place"||s.phase==="move") ? `A game is in progress. ${sc}` : sc);
+  function statuses(){
+    const c=GR.couple(), set=(id,h)=>{ const el=$(id); if(el) el.innerHTML=h; };
+    ["s-tod","s-zim","s-tsoro","s-spies","s-snakes"].forEach(id=>set(id,""));
+    if(!c) return;
+    const k=n=>J(n+"@"+c.room), N=c.slots, w=n=>`${n} win${n===1?"":"s"}`;
+    const t=k("tod.state");
+    if(t&&t.v>0&&t.scores){ const sc=`${esc(N.inno)} <b>${t.scores.inno||0}</b>, ${esc(N.leana)} <b>${t.scores.leana||0}</b>`;
+      set("s-tod", t.phase==="over" ? `Last game ended ${sc}.` : `Round ${t.round||1} is waiting for you. Points so far: ${sc}.`); }
+    const z=k("lc.state");
+    if(z&&z.v>0&&z.wins){ const sc=`${esc(N.inno)} <b>${w(z.wins.inno||0)}</b>, ${esc(N.leana)} <b>${w(z.wins.leana||0)}</b>.`;
+      set("s-zim", z.phase==="play" ? `A game is in progress. ${sc}` : sc); }
+    const s=k("ts.state");
+    if(s&&s.v>0&&s.wins){ const d=s.wins.draws?` ${s.wins.draws} draw${s.wins.draws===1?"":"s"}.`:"";
+      const sc=`${esc(N.inno)} <b>${w(s.wins.inno||0)}</b>, ${esc(N.leana)} <b>${w(s.wins.leana||0)}</b>.${d}`;
+      set("s-tsoro", (s.phase==="place"||s.phase==="move") ? `A game is in progress. ${sc}` : sc); }
+    const sp=k("sp.state");
+    if(sp&&sp.v>0&&sp.record){ const r=sp.record, rec=`Your team: <b>${r.wins} won</b>, <b>${r.losses} lost</b>.`;
+      set("s-spies", (sp.phase==="clue"||sp.phase==="guess") ? `A game is in progress, ${(sp.found||[]).length} of 15 agents found. ${rec}` : rec); }
+    const sn=k("sn.state");
+    if(sn&&sn.v>0&&sn.wins){ const sc=`${esc(N.inno)} <b>${w(sn.wins.inno||0)}</b>, ${esc(N.leana)} <b>${w(sn.wins.leana||0)}</b>.`;
+      set("s-snakes", sn.phase==="play" ? `A game is in progress: ${esc(N.inno)} on ${sn.pos.inno}, ${esc(N.leana)} on ${sn.pos.leana}. ${sc}` : sc); }
   }
 
-  // Two Spies: team record
-  const sp=J("sp.state");
-  if(sp&&sp.v>0&&sp.record){
-    const r=sp.record, rec=`Your team: <b>${r.wins} won</b>, <b>${r.losses} lost</b>.`;
-    set("s-spies", (sp.phase==="clue"||sp.phase==="guess") ? `A game is in progress, ${(sp.found||[]).length} of 15 agents found. ${rec}` : rec);
-  }
+  render();
+  // pick up new invites and partners when the page opens or comes back into view
+  async function sync(){ if(!GR.session()||busy) return; try{ await GR.refresh(); if(!GR.couple()&&GR.me()&&GR.me().partners[0]) GR.choosePartner(GR.me().partners[0].username); render(); }catch(e){} }
+  sync(); setInterval(()=>{ if(!document.hidden) sync(); },20000);
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) sync(); });
 
   // fan the cards once when they come into view
-  const fan=document.getElementById("fan");
-  const open=()=>fan.classList.add("open");
-  if("IntersectionObserver" in window){
-    const io=new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)){ setTimeout(open,150); io.disconnect(); } },{threshold:.4});
-    io.observe(fan);
-  } else open();
+  const fan=$("fan");
+  if(fan){ const open=()=>fan.classList.add("open");
+    if("IntersectionObserver" in window){ const io=new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)){ setTimeout(open,150); io.disconnect(); } },{threshold:.4}); io.observe(fan); } else open(); }
 
   // pick up new versions, like the games do
-  const BUILD="20261025-0900";
+  const BUILD="20261025-0930";
   async function check(){
     if(!/^https?:$/.test(location.protocol)) return;
+    if(document.activeElement&&/INPUT/.test(document.activeElement.tagName)) return;
     try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); const j=await r.json();
       if(j&&j.build&&j.build!==BUILD){ const k="upd-"+location.pathname+"-"+j.build; if(sessionStorage.getItem(k)) return; sessionStorage.setItem(k,"1"); location.replace(location.pathname+"?v="+encodeURIComponent(j.build)); } }catch(e){}
   }
@@ -274,5 +435,6 @@ h2{font-family:var(--display);font-weight:800;font-variation-settings:"wdth" 75;
   document.addEventListener("visibilitychange",()=>{ if(!document.hidden) check(); });
 })();
 </script>
+
 </body>
 </html>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1C3F8C">
-<title>Inno vs Leana · Two Spies</title>
+<title>Two Spies · Game room</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Figtree:wght@400;500;600;700&display=swap">
 <style>
@@ -200,22 +200,24 @@ a.link{display:inline-block}
   (*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> *)
 */
 </script>
+<script src="account.js"></script>
 <script>(function(){
 "use strict";
 /* Two Spies — a co-op word game for two phones, played like a "duet" word-spy game.
    Its own room and saved data, so the other games are never touched. */
-const ROOM="be3feccac921";
-const BASE="innoleana-spies/"+ROOM+"/";
+const COUPLE=(window.GR&&GR.couple())||null;     // who is playing, from the account on this phone
+const ROOM=COUPLE?COUPLE.room:"signed-out";
+const BASE="gr-spies/"+ROOM+"/";
 const BROKERS=["wss://broker.hivemq.com:8884/mqtt","wss://broker.emqx.io:8084/mqtt"];
-const NAMES={inno:"Inno",leana:"Leana"};
-const SIDE={inno:"A",leana:"B"};                 // Inno holds key side A, Leana side B
+const NAMES=COUPLE?COUPLE.slots:{inno:"Player 1",leana:"Player 2"};   // seat ids stay fixed; names come from the accounts
+const SIDE={inno:"A",leana:"B"};                 // seat 1 holds key side A, seat 2 side B
 const other=p=>p==="inno"?"leana":"inno";
 const TOKENS=9, AGENTS_TOTAL=15;
 
 const app=document.getElementById("app");
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
-function store(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){return null}}
+function store(k,v){k=k+"@"+ROOM;try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){return null}}
 function loadJSON(k){try{return JSON.parse(store(k)||"null")}catch(e){return null}}
 function rnd(n){ try{ const a=new Uint32Array(1); crypto.getRandomValues(a); return a[0]%n; }catch(e){ return Math.floor(Math.random()*n); } }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
@@ -310,8 +312,7 @@ const Game={
 };
 
 /* ---------- local + shared state ---------- */
-let me=store("sp.me")||store("ts.me")||store("lc.me")||store("tod.me")||null;
-if(me!=="inno"&&me!=="leana") me=null;
+let me=COUPLE?COUPLE.mySlot:null;
 let flash="", confirmEnd=false, showRules=false, pick=null, showKey=true, clueDraft={word:"",num:2};
 let state=Game.normalize(loadJSON("sp.state"));
 const lastSeen={inno:0,leana:0};
@@ -452,9 +453,9 @@ function strip(s){
   const left=s.phase==="lobby"?TOKENS:s.tokens;
   const toks=Array.from({length:TOKENS},(_,i)=>`<i class="${i<left?"on":""}"></i>`).join("");
   return `<div class="strip">
-    <div class="who2">${dot("inno")}<b>Inno</b><span class="sidepill">side A</span></div>
+    <div class="who2">${dot("inno")}<b>${esc(NAMES.inno)}</b><span class="sidepill">side A</span></div>
     <div class="mid"><div class="found"><b>${s.phase==="lobby"?0:Game.totalFound(s)}</b>/15 agents</div><div class="toks" aria-label="${left} turns left">${toks}</div><small>${left} turn${left===1?"":"s"} left</small></div>
-    <div class="who2 r"><span class="sidepill">side B</span><b>Leana</b>${dot("leana")}</div>
+    <div class="who2 r"><span class="sidepill">side B</span><b>${esc(NAMES.leana)}</b>${dot("leana")}</div>
   </div>`;
 }
 function grid(s){
@@ -488,9 +489,7 @@ function rulesList(){
   </ul>`;
 }
 function view(){
-  if(!me) return `<div class="gate"><h1>Two <em>Spies</em></h1><p>A word game you play as a team, live on both phones. Who's holding this phone?</p>
-    <div class="who"><button data-act="me" data-v="inno">Inno<small>That's me · side A</small></button><button data-act="me" data-v="leana">Leana<small>That's me · side B</small></button></div>
-    <p>Send this same link to the other person. They open it and tap their own name.</p></div>`;
+  if(!me) return `<div class="gate"><h1>Two <em>Spies</em></h1><p>${window.GR&&GR.session()?"Invite your partner on the Game room home page first. Once they accept, you can both play here.":"Log in on the Game room home page, then choose who you're playing with."}</p><p><a class="back" href="./" style="display:inline-flex;font-size:17px;padding:13px 20px">Go to Game room</a></p></div>`;
   const s=state;
   return `${netBar()}${notifBar()}${strip(s)}${s.phase==="lobby"?lobbyView(s):tableView(s)}
     ${showRules?`<div class="shade" data-act="closerules"><div class="sheet" role="dialog" aria-label="Rules"><h3>How to play</h3>${rulesList()}<button class="btn" data-act="closerules">Got it</button></div></div>`:""}`;
@@ -501,7 +500,7 @@ function lobbyView(s){
     ${r.wins||r.losses?`<p style="font-size:14px">Your team so far: ${r.wins} win${r.wins===1?"":"s"}, ${r.losses} loss${r.losses===1?"":"es"}.</p>`:""}
     <p style="font-size:14px">${NAMES[s.next||"inno"]} gives the first clue.</p>
     <button class="btn" data-act="start">Start game</button></div>
-    <div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">switch</button> · <a class="link" href="./">All games</a></span></div>`;
+    <div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">change partner</button> · <a class="link" href="./">All games</a></span></div>`;
 }
 function tableView(s){
   const o=other(me);
@@ -534,7 +533,7 @@ function tableView(s){
   const recent=s.log.slice(-4).reverse();
   const foot=confirmEnd
     ? `<div class="confirm"><span>Stop this game? It won't count.</span><div class="row"><button class="btn ghost" data-act="endno">Keep playing</button><button class="btn warn" data-act="endyes">Stop game</button></div></div>`
-    : `<div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">switch</button> · <a class="link" href="./">All games</a> · <button class="link" data-act="rules">rules</button></span>${s.phase!=="over"?`<button class="link" data-act="end">Stop game</button>`:""}</div>`;
+    : `<div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">change partner</button> · <a class="link" href="./">All games</a> · <button class="link" data-act="rules">rules</button></span>${s.phase!=="over"?`<button class="link" data-act="end">Stop game</button>`:""}</div>`;
   return `${top}${flash?`<div class="flash">${esc(flash)}</div>`:""}${grid(s)}
     ${recent.length?`<div class="log">${recent.map(l=>`<div>${esc(l.text)}</div>`).join("")}</div>`:""}${foot}`;
 }
@@ -554,8 +553,7 @@ app.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]"); if(!b) return;
   const act=b.dataset.act, v=b.dataset.v;
   if(act==="closerules"&&e.target!==b&&!b.matches("button")) return;
-  if(act==="me"){ me=v; store("sp.me",v); publish("hello",{who:me,cid:myCid,v:state.v},false,0); render(); return; }
-  if(act==="switch"){ me=null; store("sp.me",null); render(); return; }
+  if(act==="switch"){ location.href="./"; return; }
   if(act==="notif"){ try{ Notification.requestPermission().then(()=>{ render(); if(Notification.permission==="granted") toast("Notifications on","You'll get a pop-up for clues and turns.","🔔"); }); }catch(e){} return; }
   if(act==="notifno"){ store("sp.nonotif","1"); render(); return; }
   if(act==="rules"){ showRules=true; render(); return; }
@@ -583,7 +581,7 @@ if("serviceWorker" in navigator && location.protocol==="https:"){
 }
 
 /* ---------- self-update (same as the other games) ---------- */
-const BUILD="20261025-0900";
+const BUILD="20261025-0930";
 let updating=false;
 function reloadWhenSafe(b){
   const key="upd-"+location.pathname+"-"+b; try{ if(sessionStorage.getItem(key)) return; sessionStorage.setItem(key,"1"); }catch(e){}

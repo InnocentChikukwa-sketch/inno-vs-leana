@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E6B3A">
-<title>Inno vs Leana · ZIM8</title>
+<title>ZIM8 · Game room</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Figtree:wght@400;500;600;700&display=swap">
 <style>
@@ -191,13 +191,15 @@ a.link{display:inline-block}
   (*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> *)
 */
 </script>
+<script src="account.js"></script>
 <script>(function(){
 "use strict";
 /* ZIM8 for two phones — separate room and separate saved data from Truth or Dare, so the two games never touch each other. */
-const ROOM="be3feccac921";
-const BASE="innoleana-lastcard/"+ROOM+"/";
+const COUPLE=(window.GR&&GR.couple())||null;     // who is playing, from the account on this phone
+const ROOM=COUPLE?COUPLE.room:"signed-out";
+const BASE="gr-lastcard/"+ROOM+"/";
 const BROKERS=["wss://broker.hivemq.com:8884/mqtt","wss://broker.emqx.io:8084/mqtt"];
-const NAMES={inno:"Inno",leana:"Leana"};
+const NAMES=COUPLE?COUPLE.slots:{inno:"Player 1",leana:"Player 2"};   // seat ids stay fixed; names come from the accounts
 const other=p=>p==="inno"?"leana":"inno";
 const SUITS=["S","H","C","D"], SYM={S:"♠",H:"♥",D:"♦",C:"♣"}, SUITNAME={S:"Spades",H:"Hearts",D:"Diamonds",C:"Clubs"};
 const RANKS=["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
@@ -210,7 +212,7 @@ const AGAIN=["7","J","K"];                           // with two players, 7 (ski
 const app=document.getElementById("app");
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
-function store(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){return null}}
+function store(k,v){k=k+"@"+ROOM;try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){return null}}
 function loadJSON(k){try{return JSON.parse(store(k)||"null")}catch(e){return null}}
 
 /* ================= Deck ================= */
@@ -338,8 +340,7 @@ const Game={
 };
 
 /* ---------- local + shared state ---------- */
-let me=store("lc.me")||store("tod.me")||null;
-if(me!=="inno"&&me!=="leana") me=null;
+let me=COUPLE?COUPLE.mySlot:null;
 let flash="", confirmEnd=false, showRules=false, suitPick=null, lastWarn=null, lastTop=null;
 let state=Game.normalize(loadJSON("lc.state"));
 const lastSeen={inno:0,leana:0};
@@ -505,9 +506,7 @@ function scoreStrip(s){
   return `<div class="score">${side("inno")}<div class="vs">${s.phase==="play"?`${s.deck.length} cards<small>in the deck</small>`:s.phase==="over"?"Game over":"Ready to deal"}</div>${side("leana")}</div>`;
 }
 function view(){
-  if(!me) return `<div class="gate"><h1>ZIM<em>8</em></h1><p>Inno vs Leana, live on both your phones. Who's holding this phone?</p>
-    <div class="who"><button data-act="me" data-v="inno">Inno<small>That's me</small></button><button data-act="me" data-v="leana">Leana<small>That's me</small></button></div>
-    <p>Send this same link to the other person. They open it and tap their own name.</p></div>`;
+  if(!me) return `<div class="gate"><h1>ZIM<em>8</em></h1><p>${window.GR&&GR.session()?"Invite your partner on the Game room home page first. Once they accept, you can both play here.":"Log in on the Game room home page, then choose who you're playing with."}</p><p><a class="back" href="./" style="display:inline-flex;font-size:17px;padding:13px 20px">Go to Game room</a></p></div>`;
   const s=state;
   const body=s.phase==="lobby"?lobbyView(s):tableView(s);
   return `${netBar()}${notifBar()}${scoreStrip(s)}${body}${showRules?rulesSheet():""}${suitPick?suitSheet():""}${lastWarn?warnSheet(lastWarn):""}`;
@@ -538,7 +537,7 @@ function lobbyView(s){
     <p style="font-size:14px">${NAMES[s.next||"inno"]} plays first. Either of you can deal.</p>
     ${handPicker(s)}
     <button class="btn" data-act="deal">Deal ${s.handSize||HAND_SIZE} cards each</button></div>
-    <div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">switch</button> · <a class="link" href="./">All games</a></span><a class="link" href="truth-or-dare.html">Truth or Dare</a></div>`;
+    <div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">change partner</button> · <a class="link" href="./">All games</a></span><a class="link" href="truth-or-dare.html">Truth or Dare</a></div>`;
 }
 function tableView(s){
   const o=other(me), oh=s.hands[o]||[], mh=s.hands[me]||[], myTurn=s.phase==="play"&&s.turn===me;
@@ -551,7 +550,7 @@ function tableView(s){
     status=`<div class="status ${won?"mine":""}">${won?"You won! 🏆":`${NAMES[s.winner]} won`}<small>${esc(s.lastAct)}</small></div>`;
     body=`<div class="panel"><h2>${won?"Clean finish! 🏆":`${NAMES[s.winner]} finished clean`}</h2>
       ${left.length?`<p>${loser===me?"You were":NAMES[loser]+" was"} left holding ${left.length} card${left.length===1?"":"s"}:</p><div class="leftover">${Hand.sorted(left).map(c=>cardSpan(c)).join("")}</div>`:""}
-      <p>Score: Inno ${s.wins.inno} – ${s.wins.leana} Leana. ${NAMES[s.next]} starts next.</p>
+      <p>Score: ${esc(NAMES.inno)} ${s.wins.inno} – ${s.wins.leana} ${esc(NAMES.leana)}. ${NAMES[s.next]} starts next.</p>
       ${handPicker(s)}
       <div class="row"><button class="btn" data-act="deal">Deal again · ${s.handSize||HAND_SIZE} each</button></div></div>`;
   } else {
@@ -578,7 +577,7 @@ function tableView(s){
   const recent=s.log.slice(-4).reverse();
   const foot=confirmEnd
     ? `<div class="confirm"><span>Stop this game? Nobody gets a win.</span><div class="row"><button class="btn ghost" data-act="endno">Keep playing</button><button class="btn warn" data-act="endyes">Stop game</button></div></div>`
-    : `<div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">switch</button> · <a class="link" href="./">All games</a> · <button class="link" data-act="rules">rules</button></span>${s.phase==="play"?`<button class="link" data-act="end">Stop game</button>`:`<a class="link" href="truth-or-dare.html">Truth or Dare</a>`}</div>`;
+    : `<div class="foot"><span>You're ${NAMES[me]} · <button class="link" data-act="switch">change partner</button> · <a class="link" href="./">All games</a> · <button class="link" data-act="rules">rules</button></span>${s.phase==="play"?`<button class="link" data-act="end">Stop game</button>`:`<a class="link" href="truth-or-dare.html">Truth or Dare</a>`}</div>`;
   return `<div class="opp"><div class="backs" aria-label="${NAMES[o]} has ${oh.length} cards">${backs}</div>
       <span>${NAMES[o]} · ${oh.length} card${oh.length===1?"":"s"}${oh.length===1&&s.phase==="play"?` · <span class="lastcard">LAST CARD</span>`:""}</span></div>
     <div class="table">
@@ -614,8 +613,7 @@ app.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]"); if(!b) return;
   const act=b.dataset.act, v=b.dataset.v;
   if((act==="closerules"||act==="suitcancel"||act==="warncancel")&&e.target!==b) return; // tap inside the sheet, not on the backdrop
-  if(act==="me"){ me=v; store("lc.me",v); publish("hello",{who:me,cid:myCid,v:state.v},false,0); render(); return; }
-  if(act==="switch"){ me=null; store("lc.me",null); render(); return; }
+  if(act==="switch"){ location.href="./"; return; }
   if(act==="notif"){ try{ Notification.requestPermission().then(()=>{ render(); if(Notification.permission==="granted") toast("Notifications on","You'll get a pop-up when it's your turn.","🔔"); }); }catch(e){} return; }
   if(act==="notifno"){ store("lc.nonotif","1"); render(); return; }
   if(act==="rules"){ showRules=true; render(); return; }
@@ -640,7 +638,7 @@ if("serviceWorker" in navigator && location.protocol==="https:"){
 }
 
 /* ---------- self-update: when a new version is published, reload onto it (the game itself is saved, so nothing is lost) ---------- */
-const BUILD="20261025-0900";
+const BUILD="20261025-0930";
 let updating=false;
 function reloadWhenSafe(b){
   const key="upd-"+location.pathname+"-"+b; try{ if(sessionStorage.getItem(key)) return; sessionStorage.setItem(key,"1"); }catch(e){}
