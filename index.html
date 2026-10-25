@@ -84,7 +84,7 @@ h2{font-family:var(--display);font-weight:800;font-variation-settings:"wdth" 75;
 <header class="hero wrap">
   <div class="top"><span>Inno &amp; Leana</span><span class="hi" id="hi"></span></div>
   <h1>Game room</h1>
-  <p class="lede">Three games for two phones. Pick one, then send the same link to the other person.</p>
+  <p class="lede">Game nights for the two of you, even when you're apart. Pick a game, then send the same link to your partner.</p>
 </header>
 
 <main>
@@ -229,7 +229,7 @@ h2{font-family:var(--display);font-weight:800;font-variation-settings:"wdth" 75;
   } else open();
 
   // pick up new versions, like the games do
-  const BUILD="20261025-0820";
+  const BUILD="20261025-0840";
   async function check(){
     if(!/^https?:$/.test(location.protocol)) return;
     try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); const j=await r.json();
