@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 10000;
 const DATABASE_URL = process.env.DATABASE_URL;
 const BREVO_API_KEY = process.env.BREVO_API_KEY || "";
 const MAIL_FROM = process.env.MAIL_FROM || "";            // a sender address verified in Brevo
+const ADMIN_KEY = process.env.ADMIN_KEY || "";             // the password for admin.html; admin is switched off until it is set
 const SITE_URL = process.env.SITE_URL || "https://inno-vs-leana.onrender.com/";
 
 if (!DATABASE_URL) console.error("DATABASE_URL is not set yet: accounts are switched off until it is");
@@ -49,6 +50,15 @@ async function migrate() {
       to_id int not null references users(id) on delete cascade,
       created_at timestamptz not null default now(),
       primary key(from_id, to_id));
+    create table if not exists presence(
+      user_id int primary key references users(id) on delete cascade,
+      game text not null default 'home',
+      last_ping timestamptz not null default now());
+    create table if not exists activity(
+      day date not null,
+      user_id int not null references users(id) on delete cascade,
+      game text not null,
+      primary key(day, user_id, game));
   `);
 }
 
@@ -109,6 +119,13 @@ function limited(req, key, max = 20, windowMs = 10 * 60 * 1000) {
   const list = (hits.get(k) || []).filter((t) => now - t < windowMs);
   list.push(now); hits.set(k, list);
   return list.length > max;
+}
+
+const GAMES = ["home", "tod", "zim8", "tsoro", "spies", "snakes", "yemakomba"];
+const TODAY = "(now() at time zone 'Africa/Harare')::date";
+function isAdmin(req) {
+  const given = String(req.headers["x-admin-key"] || "");
+  return crypto.timingSafeEqual(Buffer.from(sha(given)), Buffer.from(sha(ADMIN_KEY)));
 }
 
 async function sendWelcome(email, username) {
@@ -232,15 +249,82 @@ const routes = {
     if (to) await pool.query("delete from invites where from_id=$1 and to_id=$2", [user.id, to.id]);
     return [200, await meResponse(user)];
   },
+
+  // phones tell the server which page is open (once a minute) so the admin page can count who is online
+  "POST /api/ping": async (req, url, body, user) => {
+    let game = String(body.game || "").toLowerCase().replace(/[^a-z0-9]/g, "") || "home";
+    if (!GAMES.includes(game)) game = "home";
+    await pool.query(
+      "insert into presence(user_id,game,last_ping) values($1,$2,now()) on conflict (user_id) do update set game=$2, last_ping=now()", [user.id, game]);
+    await pool.query(`insert into activity(day,user_id,game) values(${TODAY},$1,$2) on conflict do nothing`, [user.id, game]);
+    return [200, { ok: true }];
+  },
+
+  /* ----- admin (needs the x-admin-key header) ----- */
+  "GET /api/admin/stats": async () => {
+    const q = (sql, args) => pool.query(sql, args).then((r) => r.rows);
+    const [[tot], online, signups, today, week, [dau], [wau], recent] = await Promise.all([
+      q(`select (select count(*) from users)::int users, (select count(*) from pairs)::int couples,
+                (select count(*) from invites)::int invites, (select count(*) from sessions)::int devices`),
+      q(`select u.username, p.game, extract(epoch from now()-p.last_ping)::int ago
+           from presence p join users u on u.id=p.user_id
+          where p.last_ping > now() - interval '150 seconds' order by p.last_ping desc`),
+      q(`select to_char((created_at at time zone 'Africa/Harare')::date,'YYYY-MM-DD') as day, count(*)::int as n
+           from users where (created_at at time zone 'Africa/Harare')::date >= ${TODAY} - 13 group by 1`),
+      q(`select game, count(distinct user_id)::int n from activity where day=${TODAY} group by game`),
+      q(`select game, count(distinct user_id)::int n from activity where day>=${TODAY} - 6 group by game`),
+      q(`select count(distinct user_id)::int n from activity where day=${TODAY}`),
+      q(`select count(distinct user_id)::int n from activity where day>=${TODAY} - 6`),
+      q(`select u.username, u.created_at,
+                exists(select 1 from pairs p where p.user_lo=u.id or p.user_hi=u.id) paired
+           from users u order by u.created_at desc limit 8`),
+    ]);
+    const byGame = {};
+    online.forEach((r) => { byGame[r.game] = (byGame[r.game] || 0) + 1; });
+    const perGame = (rows) => Object.fromEntries(rows.filter((r) => r.game !== "home").map((r) => [r.game, r.n]));
+    return [200, {
+      totals: tot, online: { count: online.length, byGame, people: online },
+      activeToday: dau.n, active7d: wau.n,
+      gamesToday: perGame(today), games7d: perGame(week),
+      signups: signups, recent, serverTime: new Date().toISOString(),
+    }];
+  },
+
+  "GET /api/admin/users": async (req, url) => {
+    const term = "%" + String(url.searchParams.get("q") || "").trim().replace(/[%_\\]/g, "") + "%";
+    const r = await pool.query(`
+      select u.id, u.username, u.email, u.created_at,
+             (select count(*) from sessions s where s.user_id=u.id)::int devices,
+             greatest(p.last_ping, (select max(last_seen) from sessions s where s.user_id=u.id)) last_seen,
+             coalesce(p.last_ping > now() - interval '150 seconds', false) online, p.game,
+             coalesce((select string_agg(o.username, ', ' order by o.username) from pairs pr
+                        join users o on o.id = case when pr.user_lo=u.id then pr.user_hi else pr.user_lo end
+                       where pr.user_lo=u.id or pr.user_hi=u.id), '') partners
+        from users u left join presence p on p.user_id=u.id
+       where u.username ilike $1 or coalesce(u.email,'') ilike $1
+       order by u.created_at desc limit 200`, [term]);
+    return [200, { users: r.rows }];
+  },
+
+  "POST /api/admin/signout": async (req, url, body) => {
+    const r = await pool.query("delete from sessions where user_id=$1", [Number(body.id) || 0]);
+    return [200, { ok: true, signedOut: r.rowCount }];
+  },
+
+  "POST /api/admin/delete-user": async (req, url, body) => {
+    const r = await pool.query("delete from users where id=$1 returning username", [Number(body.id) || 0]);
+    return [200, { ok: true, deleted: r.rows[0] ? r.rows[0].username : null }];
+  },
 };
-const NEEDS_LOGIN = new Set(["GET /api/me", "POST /api/invite", "POST /api/invite/respond", "POST /api/invite/cancel"]);
+const NEEDS_ADMIN = new Set(["GET /api/admin/stats", "GET /api/admin/users", "POST /api/admin/signout", "POST /api/admin/delete-user"]);
+const NEEDS_LOGIN = new Set(["POST /api/ping", "GET /api/me", "POST /api/invite", "POST /api/invite/respond", "POST /api/invite/cancel"]);
 
 /* ---------- http ---------- */
 function send(res, status, obj) {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
-    "access-control-allow-headers": "content-type, authorization",
+    "access-control-allow-headers": "content-type, authorization, x-admin-key",
     "access-control-allow-methods": "GET, POST, OPTIONS",
     "cache-control": "no-store",
   });
@@ -255,6 +339,13 @@ const server = http.createServer(async (req, res) => {
   if (!fn) return send(res, 404, { error: "Not found" });
   if (!pool && key !== "GET /api/health") return send(res, 503, { error: "Accounts aren't switched on yet. Try again a bit later." });
   try {
+    if (NEEDS_ADMIN.has(key)) {
+      if (!ADMIN_KEY) return send(res, 503, { error: "Admin isn't set up yet: add an ADMIN_KEY on the server." });
+      if (!isAdmin(req)) {
+        if (limited(req, "adminfail", 10)) return send(res, 429, { error: "Too many wrong keys. Wait ten minutes." });
+        return send(res, 401, { error: "Wrong admin key." });
+      }
+    }
     let body = {};
     if (req.method === "POST") {
       let raw = "";

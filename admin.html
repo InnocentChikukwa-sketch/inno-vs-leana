@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#000000">
+<title>Game room · Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Figtree:wght@400;500;600;700;800&display=swap">
+<style>
+:root{--sun:#FFD200;--red:#D21F26;--green:#0E6B3A;--ink:#000;--paper:#fff;--grey:#5b5b5b;
+ --display:"Bricolage Grotesque","Arial Narrow",system-ui,sans-serif;--body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--sun);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.4}
+:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+header.top{background:var(--ink);color:var(--sun);padding:14px 0}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header.top h1{margin:0;font-family:var(--display);font-weight:800;font-size:28px;letter-spacing:-.01em;font-variation-settings:"wdth" 80}
+.meta{font-size:14px;color:#e6e6e6;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.live{width:10px;height:10px;border-radius:50%;background:#2fd37a;display:inline-block;animation:p 1.6s ease-in-out infinite}
+.live.off{background:#888;animation:none}
+@keyframes p{50%{opacity:.35}}
+button,.btn{font:inherit;font-weight:700;border:0;border-radius:999px;padding:10px 16px;min-height:44px;cursor:pointer;background:var(--ink);color:var(--sun)}
+button.ghost{background:transparent;color:inherit;border:2px solid currentColor}
+button.danger{background:var(--red);color:#fff}
+button.small{min-height:36px;padding:6px 12px;font-size:14px}
+button:disabled{opacity:.5;cursor:default}
+main.wrap{padding:20px 16px 56px}
+h2{font-family:var(--display);font-weight:800;font-size:26px;margin:28px 0 10px;letter-spacing:-.01em;font-variation-settings:"wdth" 85}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.card{background:var(--paper);border-radius:18px;padding:14px 16px}
+.card .n{font-family:var(--display);font-weight:800;font-size:44px;line-height:1;font-variation-settings:"wdth" 80}
+.card .l{font-size:14px;font-weight:600;color:var(--grey);margin-top:4px}
+.card.hot{background:var(--ink);color:var(--sun)}.card.hot .l{color:#ddd}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.panel{background:var(--paper);border-radius:18px;padding:16px}
+.panel h3{margin:0 0 10px;font-size:16px;font-weight:800}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar{display:grid;grid-template-columns:128px 1fr 64px;align-items:center;gap:10px;font-size:14px;font-weight:600}
+.bar .track{background:#eee;border-radius:999px;height:16px;overflow:hidden}
+.bar .fill{height:100%;border-radius:999px;background:var(--ink);min-width:0}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums}
+.chart{display:flex;align-items:flex-end;gap:5px;height:130px}
+.chart .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%;font-size:11px;font-weight:700}
+.chart .col i{display:block;width:100%;background:var(--ink);border-radius:5px 5px 0 0;min-height:2px}
+.chart .col span{color:var(--grey);font-weight:600}
+ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+ul.list li{display:flex;justify-content:space-between;gap:10px;font-size:15px;padding:6px 0;border-bottom:1px solid #eee}
+ul.list li:last-child{border-bottom:0}
+.tag{display:inline-block;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:700;background:var(--ink);color:var(--sun);white-space:nowrap}
+.tag.g-tod{background:var(--red);color:#fff}.tag.g-zim8{background:var(--green);color:#fff}
+.tag.g-tsoro{background:#000;color:#fff}.tag.g-spies{background:#fff;color:#000;border:2px solid #000;padding:0 8px}
+.tag.g-snakes{background:#3E8EDE;color:#000}.tag.g-yemakomba{background:#7A4A22;color:#fff}.tag.g-home{background:#ddd;color:#000}
+.muted{color:var(--grey)}
+.search{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.search input{flex:1;min-width:200px;font:inherit;padding:10px 14px;border:2px solid #000;border-radius:12px;min-height:44px;background:#fff}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15px;min-width:720px}
+th{text-align:left;font-size:13px;color:var(--grey);font-weight:700;padding:6px 8px;border-bottom:2px solid #000;white-space:nowrap}
+td{padding:8px;border-bottom:1px solid #eee;vertical-align:middle}
+td.act{white-space:nowrap;text-align:right}td.act button{margin-left:6px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;background:#bbb}
+.dot.on{background:#1aa65f}
+.login{max-width:420px;margin:12vh auto 0;background:var(--paper);border-radius:22px;padding:24px}
+.login h2{margin-top:0}
+.login input{width:100%;font:inherit;padding:12px 14px;border:2px solid #000;border-radius:12px;min-height:48px;margin:10px 0 12px}
+.err{color:var(--red);font-weight:700;min-height:22px;margin:4px 0 8px}
+.empty{color:var(--grey);font-size:15px;padding:6px 0}
+@media (max-width:520px){.bar{grid-template-columns:96px 1fr 44px}.card .n{font-size:36px}}
+@media (prefers-reduced-motion:reduce){.live{animation:none}}
+</style>
+</head>
+<body>
+
+<section id="login" class="wrap" hidden>
+ <form class="login" id="loginForm">
+  <h2>Admin</h2>
+  <p class="muted">Enter the admin key you set on the server.</p>
+  <label for="key" style="font-weight:700">Admin key</label>
+  <input id="key" type="password" autocomplete="current-password" required>
+  <div class="err" id="loginErr" role="alert"></div>
+  <button type="submit" id="loginBtn">Open dashboard</button>
+ </form>
+</section>
+
+<div id="app" hidden>
+ <header class="top"><div class="wrap">
+  <h1>Game room · Admin</h1>
+  <div class="meta"><span class="live" id="live"></span><span id="updated">Loading…</span>
+   <button class="ghost small" id="refresh" type="button">Refresh</button>
+   <button class="ghost small" id="logout" type="button">Lock</button></div>
+ </div></header>
+ <main class="wrap">
+  <div class="cards" id="cards"></div>
+
+  <h2>Playing right now</h2>
+  <div class="grid2">
+   <div class="panel"><h3>Who is online <span class="muted" id="onlineCount"></span></h3><ul class="list" id="onlineList"></ul></div>
+   <div class="panel"><h3>Online by game</h3><div class="bars" id="onlineBars"></div></div>
+  </div>
+
+  <h2>Which games get played</h2>
+  <div class="grid2">
+   <div class="panel"><h3>Players today</h3><div class="bars" id="todayBars"></div></div>
+   <div class="panel"><h3>Players in the last 7 days</h3><div class="bars" id="weekBars"></div></div>
+  </div>
+
+  <h2>Growth</h2>
+  <div class="grid2">
+   <div class="panel"><h3>New sign-ups, last 14 days</h3><div class="chart" id="signups"></div></div>
+   <div class="panel"><h3>Newest players</h3><ul class="list" id="recent"></ul></div>
+  </div>
+
+  <h2>All players</h2>
+  <div class="panel">
+   <form class="search" id="searchForm" role="search">
+    <input id="q" type="search" placeholder="Search by username or email" aria-label="Search players">
+    <button type="submit">Search</button>
+   </form>
+   <div class="tablewrap"><table>
+    <thead><tr><th>Player</th><th>Status</th><th>Partner</th><th>Joined</th><th>Last seen</th><th></th></tr></thead>
+    <tbody id="users"></tbody>
+   </table></div>
+   <p class="muted" id="usersNote"></p>
+  </div>
+  <p class="muted" style="margin-top:18px">Online means a phone had the site open in the last 2½ minutes. People who haven't made an account can't be counted. Passwords are never visible to anyone, including you.</p>
+ </main>
+</div>
+
+<script>
+(function(){
+"use strict";
+const DEFAULT_API="https://game-room-api-4k6l.onrender.com";
+const store={get:k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v)}catch(e){}}};
+let API=DEFAULT_API; try{API=(localStorage.getItem("gr.api")||DEFAULT_API).replace(/\/+$/,"")}catch(e){}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const NAMES={tod:"Truth or Dare",zim8:"ZIM8",tsoro:"Tsoro Yematatu",spies:"Two Spies",snakes:"Snakes & Ladders",yemakomba:"Tsoro yemakomba",home:"Home page"};
+const GAMES=["tod","zim8","tsoro","spies","snakes","yemakomba"];
+let key=store.get("gr.admin"), timer=null, busy=false, lastQ="";
+
+async function api(path,opts){
+  opts=opts||{};
+  const r=await fetch(API+path,{method:opts.method||"GET",headers:{"content-type":"application/json","x-admin-key":key||""},body:opts.body?JSON.stringify(opts.body):undefined});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok){const e=new Error(data.error||"Something went wrong.");e.status=r.status;throw e}
+  return data;
+}
+function ago(sec){ if(sec<90)return "just now"; const m=Math.round(sec/60); if(m<60)return m+" min ago"; const h=Math.round(m/60); if(h<48)return h+" h ago"; return Math.round(h/24)+" days ago"; }
+function agoDate(d){ return d?ago((Date.now()-new Date(d).getTime())/1000):"never"; }
+function dateFmt(d){ return new Date(d).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",timeZone:"Africa/Harare"}); }
+const tag=g=>`<span class="tag g-${esc(g)}">${esc(NAMES[g]||g)}</span>`;
+
+function bars(el,map,keys){
+  const max=Math.max(1,...keys.map(k=>map[k]||0));
+  el.innerHTML=keys.map(k=>{const v=map[k]||0;return `<div class="bar"><span>${esc(NAMES[k]||k)}</span><span class="track"><span class="fill" style="display:block;width:${v?Math.max(4,v/max*100):0}%"></span></span><span class="v">${v}</span></div>`}).join("");
+}
+function render(s){
+  const t=s.totals;
+  $("cards").innerHTML=[
+    ["hot",s.online.count,"Online now"],["",s.activeToday,"Played today"],["",s.active7d,"Active last 7 days"],
+    ["",t.users,"Registered players"],["",t.couples,"Couples paired"],["",t.invites,"Invites waiting"],["",t.devices,"Signed-in phones"]
+  ].map(c=>`<div class="card ${c[0]}"><div class="n">${c[1]}</div><div class="l">${c[2]}</div></div>`).join("");
+  $("onlineCount").textContent=s.online.count?"("+s.online.count+")":"";
+  $("onlineList").innerHTML=s.online.people.length?s.online.people.map(p=>`<li><span>${esc(p.username)}</span><span>${tag(p.game)} <span class="muted">${ago(p.ago)}</span></span></li>`).join(""):'<li class="empty">Nobody is online right now.</li>';
+  bars($("onlineBars"),s.online.byGame,["home",...GAMES]);
+  bars($("todayBars"),s.gamesToday,GAMES);
+  bars($("weekBars"),s.games7d,GAMES);
+  // 14 days, oldest first, in Harare time
+  const by=Object.fromEntries(s.signups.map(x=>[x.day,x.n])), days=[];
+  const base=new Date(new Date().toLocaleString("en-US",{timeZone:"Africa/Harare"}));
+  for(let i=13;i>=0;i--){const d=new Date(base);d.setDate(d.getDate()-i);const k=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");days.push({k,d:d.getDate(),n:by[k]||0})}
+  const mx=Math.max(1,...days.map(d=>d.n));
+  $("signups").innerHTML=days.map(d=>`<div class="col" title="${d.k}: ${d.n}">${d.n||""}<i style="height:${d.n?Math.max(6,d.n/mx*88):2}px"></i><span>${d.d}</span></div>`).join("");
+  $("recent").innerHTML=s.recent.length?s.recent.map(r=>`<li><span>${esc(r.username)}</span><span class="muted">${r.paired?"paired · ":""}${agoDate(r.created_at)}</span></li>`).join(""):'<li class="empty">No players yet.</li>';
+  $("updated").textContent="Updated "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"Africa/Harare"});
+  $("live").className="live";
+}
+function renderUsers(list){
+  $("users").innerHTML=list.length?list.map(u=>`<tr>
+   <td><b>${esc(u.username)}</b>${u.email?`<br><span class="muted">${esc(u.email)}</span>`:""}</td>
+   <td><span class="dot ${u.online?"on":""}"></span>${u.online?esc(NAMES[u.game]||"Online"):"Offline"}</td>
+   <td>${esc(u.partners)||'<span class="muted">none</span>'}</td>
+   <td>${dateFmt(u.created_at)}</td><td>${agoDate(u.last_seen)}</td>
+   <td class="act"><button class="ghost small" data-out="${u.id}" data-name="${esc(u.username)}" ${u.devices?"":"disabled"}>Sign out</button><button class="danger small" data-del="${u.id}" data-name="${esc(u.username)}">Delete</button></td></tr>`).join("")
+   :'<tr><td colspan="6" class="empty">No players found.</td></tr>';
+  $("usersNote").textContent=list.length>=200?"Showing the newest 200. Use search to find others.":"";
+}
+async function load(){
+  if(busy)return; busy=true;
+  try{
+    const [s,u]=await Promise.all([api("/api/admin/stats"),api("/api/admin/users?q="+encodeURIComponent(lastQ))]);
+    render(s); renderUsers(u.users);
+  }catch(e){
+    if(e.status===401||e.status===429||e.status===503){ lock(e.message); return; }
+    $("live").className="live off"; $("updated").textContent="Can't reach the server. Retrying…";
+  }finally{busy=false}
+}
+function start(){
+  $("login").hidden=true; $("app").hidden=false; load();
+  clearInterval(timer); timer=setInterval(()=>{ if(!document.hidden) load(); },15000);
+}
+function lock(msg){
+  clearInterval(timer); key=null; store.set("gr.admin",null);
+  $("app").hidden=true; $("login").hidden=false; $("loginErr").textContent=msg||""; $("key").value=""; $("key").focus();
+}
+$("loginForm").addEventListener("submit",async e=>{
+  e.preventDefault(); key=$("key").value; $("loginBtn").disabled=true; $("loginErr").textContent="";
+  try{
+    const slow=setTimeout(()=>{$("loginErr").textContent="Waking the server, give it up to a minute…"},3500);
+    await api("/api/admin/stats"); clearTimeout(slow); store.set("gr.admin",key); start();
+  }catch(err){ $("loginErr").textContent=err.status?err.message:"Can't reach the server. Check your internet."; key=null }
+  finally{ $("loginBtn").disabled=false }
+});
+$("refresh").addEventListener("click",load);
+$("logout").addEventListener("click",()=>lock(""));
+$("searchForm").addEventListener("submit",e=>{e.preventDefault(); lastQ=$("q").value.trim(); load();});
+$("users").addEventListener("click",async e=>{
+  const out=e.target.closest("[data-out]"), del=e.target.closest("[data-del]");
+  try{
+    if(out){ if(!confirm("Sign "+out.dataset.name+" out of all their phones? They can log back in with their password.")) return;
+      await api("/api/admin/signout",{method:"POST",body:{id:Number(out.dataset.out)}}); load(); }
+    if(del){ if(!confirm("Delete "+del.dataset.name+" for good? Their account, partnerships and invites are removed and the username becomes free. This cannot be undone.")) return;
+      await api("/api/admin/delete-user",{method:"POST",body:{id:Number(del.dataset.del)}}); load(); }
+  }catch(err){ alert(err.message); }
+});
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&key) load(); });
+if(key) start(); else { $("login").hidden=false; $("key").focus(); }
+})();
+</script>
+</body>
+</html>

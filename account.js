@@ -51,6 +51,24 @@
     return data;
   }
 
+  // Tell the server which page is open, once a minute while the screen is on, so the admin page can count who is online.
+  (function () {
+    if (!/^https?:$/.test(location.protocol)) return;
+    function ping() {
+      const s = session();
+      if (!s || document.hidden) return;
+      const tag = document.querySelector("script[data-game]");   // the presence.js tag, found when pinging because it loads after this file
+      const game = (tag && tag.dataset.game) || "home";
+      fetch(API + "/api/ping", { method: "POST", keepalive: true,
+        headers: { "content-type": "application/json", authorization: "Bearer " + s.token },
+        body: JSON.stringify({ game }) })
+        .then((r) => { if (r.status === 401) set("gr.session", null); }).catch(() => {});
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ping); else ping();
+    setInterval(ping, 60000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) ping(); });
+  })();
+
   window.GR = {
     API, session, me, couple, choosePartner,
     available: (u, o) => call("/api/available?u=" + encodeURIComponent(u), o),
