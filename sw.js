@@ -10,7 +10,7 @@ self.addEventListener("notificationclick", (e) => {
   e.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       const same = url
-        ? list.filter((c) => c.url.split("#")[0] === url.split("#")[0])
+        ? list.filter((c) => c.url.split(/[?#]/)[0] === url.split(/[?#]/)[0])
         : list.filter((c) => !/(lastcard|tsoro)\.html/.test(c.url)); // Truth or Dare notifications
       for (const c of same.length ? same : list) {
         if ("focus" in c) {
