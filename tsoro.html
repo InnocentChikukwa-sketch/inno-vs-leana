@@ -515,7 +515,7 @@ if("serviceWorker" in navigator && location.protocol==="https:"){
 }
 
 /* ---------- self-update (same as the other games) ---------- */
-const BUILD="20261025-0930";
+const BUILD="20261025-0915";
 let updating=false;
 function reloadWhenSafe(b){
   const key="upd-"+location.pathname+"-"+b; try{ if(sessionStorage.getItem(key)) return; sessionStorage.setItem(key,"1"); }catch(e){}
@@ -536,5 +536,6 @@ render();
 connect();
 })();
 </script>
+<script src="presence.js" data-game="tsoro" data-title="Tsoro Yematatu" data-url="tsoro.html"></script>
 </body>
 </html>

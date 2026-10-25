@@ -638,7 +638,7 @@ if("serviceWorker" in navigator && location.protocol==="https:"){
 }
 
 /* ---------- self-update: when a new version is published, reload onto it (the game itself is saved, so nothing is lost) ---------- */
-const BUILD="20261025-0930";
+const BUILD="20261025-0915";
 let updating=false;
 function reloadWhenSafe(b){
   const key="upd-"+location.pathname+"-"+b; try{ if(sessionStorage.getItem(key)) return; sessionStorage.setItem(key,"1"); }catch(e){}
@@ -660,5 +660,6 @@ render();
 connect();
 })();
 </script>
+<script src="presence.js" data-game="zim8" data-title="ZIM8" data-url="lastcard.html"></script>
 </body>
 </html>
