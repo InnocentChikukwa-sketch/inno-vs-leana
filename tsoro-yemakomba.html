@@ -30,6 +30,14 @@
   .btn:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 #000}
   .btn:disabled{opacity:.5}
   @media (prefers-reduced-motion:reduce){.hole.drop{animation:none}}
+  .seg{display:inline-flex;border:2px solid #000;border-radius:999px;overflow:hidden;background:#fff}
+  .seg button{padding:.35rem .9rem;font-weight:800;font-size:14px}
+  .seg button[aria-pressed=true]{background:#000;color:#FFD200}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#999;margin-right:6px;vertical-align:middle}
+  .dot.on{background:#0E6B3A;box-shadow:0 0 0 3px rgba(14,107,58,.25)}
+  .toast{position:fixed;left:50%;top:12px;transform:translate(-50%,-160%);z-index:50;background:#000;color:#FFD200;border-radius:16px;padding:10px 16px;font-weight:800;max-width:92vw;transition:transform .3s}
+  .toast.show{transform:translate(-50%,0)}
+  .note{background:rgba(255,255,255,.75);border:2px solid #000;border-radius:14px;padding:10px 12px;font-size:14px;font-weight:600}
 </style>
 </head>
 <body class="min-h-screen text-black">
@@ -39,7 +47,17 @@
     <span class="text-sm font-bold">Moves: <span id="moves">0</span></span>
   </div>
   <h1 class="text-3xl font-extrabold tracking-tight px-1">Tsoro yemakomba</h1>
-  <p class="mt-1 text-sm font-medium px-1">Two players, one each side of the line (2 rows &times; 4 holes), take turns. Each side has a <b style="color:#b3171d">red master hole</b>: if your last ball lands there you can't pick up, and the other player plays. Tap a hole to pick up its balls; they drop one by one around that side (clockwise, the small numbers show the order). If your last ball lands in a hole that already has balls, pick them all up and keep going. If it lands in an empty hole, your turn passes. <b>The first to gather every ball of their side into one hole wins.</b></p>
+
+  <div class="mt-2 px-1 flex flex-wrap items-center gap-2">
+    <div class="seg" role="group" aria-label="How to play">
+      <button type="button" id="mLocal" aria-pressed="false">Same phone</button>
+      <button type="button" id="mOnline" aria-pressed="true">With partner online</button>
+    </div>
+    <span id="who" class="text-sm font-bold"></span>
+  </div>
+  <div id="net" class="note mt-3 hidden"></div>
+
+  <p class="mt-3 text-sm font-medium px-1">Two players, one each side of the line (2 rows &times; 4 holes), take turns. Each side has a <b style="color:#b3171d">red master hole</b>: if your last ball lands there you can't pick up, and the other player plays. Tap a hole to pick up its balls; they drop one by one around that side (clockwise, the small numbers show the order). If your last ball lands in a hole that already has balls, pick them all up and keep going. If it lands in an empty hole, your turn passes. <b>The first to gather every ball of their side into one hole wins.</b></p>
 
   <div class="mt-3 flex flex-wrap items-center gap-2 px-1" role="group" aria-label="Balls per hole">
     <span class="font-bold text-sm">Balls per hole:</span>
@@ -51,7 +69,7 @@
   <p id="status" class="text-center font-bold min-h-[1.5rem] mt-4" aria-live="polite"></p>
 
   <div class="mt-3 flex flex-wrap justify-center gap-3">
-    <button id="reset" class="btn bg-white">Restart</button>
+    <button id="reset" class="btn bg-white">New game</button>
     <button id="solve" class="btn bg-black text-yellow-300">Solve</button>
     <button id="play" class="btn bg-green-600 text-white hidden">Auto-play solution</button>
   </div>
@@ -61,19 +79,34 @@
     <div id="outBody" class="text-sm mt-1"></div>
   </section>
 </main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script src="account.js"></script>
+<script src="mqtt.js"></script>
 <script>
 "use strict";
 const L = 8;                             // holes in one side's loop (2 rows x 4)
 const DELAY = 300;                       // ms between ball drops
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-let per = 4, sides = [], moves = 0, busy = false, solving = false, stopAuto = false, solutions = null, turn = 1, over = false;
-const NAME = ["Top side", "Bottom side"];
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const COUPLE = (window.GR && GR.couple()) || null;
+const ROOM = COUPLE ? COUPLE.room : "local";
+const BASE = "gr-yemakomba/" + ROOM + "/";
+const BROKERS = ["wss://broker.hivemq.com:8884/mqtt", "wss://broker.emqx.io:8084/mqtt"];
+const SEATS = ["inno", "leana"];         // state.sides[0] is the first seat's side, [1] the second's
+const meIdx = COUPLE ? SEATS.indexOf(COUPLE.mySlot) : 1;
+const store = (k, v) => { k = k + "@" + ROOM; try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } };
+const rnd = (n) => Math.floor(Math.random() * n);
 
-/* where loop position i sits on the grid; the loop runs clockwise round its own side */
-function cell(side, i) {
-  if (side === 0) return i < 4 ? { r: 1, c: 3 - i } : { r: 0, c: i - 4 };
+let mode = COUPLE && store("ym.mode") !== "local" ? "online" : "local";
+const bottomIdx = () => (mode === "online" ? meIdx : 1);          // whose side is drawn at the bottom of this screen
+const nameOf = (k) => (mode === "online" && COUPLE ? COUPLE.slots[SEATS[k]] + (k === meIdx ? " (you)" : "") : k === 1 ? "Bottom side" : "Top side");
+const shortName = (k) => (mode === "online" && COUPLE ? (k === meIdx ? "You" : COUPLE.slots[SEATS[k]]) : nameOf(k));
+
+/* where loop position i sits on the grid, for the side drawn at the top (0) or bottom (1) */
+function cell(v, i) {
+  if (v === 0) return i < 4 ? { r: 1, c: 3 - i } : { r: 0, c: i - 4 };
   return i < 4 ? { r: 2, c: i } : { r: 3, c: 7 - i };
 }
 
@@ -83,11 +116,11 @@ function simulate(b, i, tot, m) {
   let hand = b[i], p = i, laps = 0; b[i] = 0;
   while (true) {
     while (hand > 0) { p = (p + 1) % L; b[p]++; hand--; }
-    if (b[p] === tot) return { b, win: true };
-    if (p === m) return { b, pass: true };           // red master hole: no pick-up, the other player plays
-    if (b[p] === 1) return { b, pass: true };       // landed in an empty hole: the turn passes
-    if (++laps > 500) return { loop: true };
-    hand = b[p]; b[p] = 0;                           // chain reaction
+    if (b[p] === tot) return { b, win: true, end: "win", p };
+    if (p === m) return { b, pass: true, end: "master", p };       // red master hole: no pick-up
+    if (b[p] === 1) return { b, pass: true, end: "empty", p };     // landed in an empty hole: the turn passes
+    if (++laps > 500) return { b, pass: true, loop: true, end: "loop", p };
+    hand = b[p]; b[p] = 0;                                         // chain reaction
   }
 }
 /* Best-first backtracking search: always expand the most promising position next
@@ -98,7 +131,7 @@ function solveSearch(start, m, maxNodes, maxMs) {
   const score = (b) => { let s = 0; for (const v of b) s += v * v; return s; };
   const H = [];
   const push = (x) => { H.push(x); let i = H.length - 1; while (i) { const p = (i - 1) >> 1; if (H[p].s >= H[i].s) break; [H[p], H[i]] = [H[i], H[p]]; i = p; } };
-  const pop = () => { const t = H[0], l = H.pop(); if (H.length) { H[0] = l; let i = 0; for (;;) { const a = 2 * i + 1, c = a + 1; let m = i; if (a < H.length && H[a].s > H[m].s) m = a; if (c < H.length && H[c].s > H[m].s) m = c; if (m === i) break; [H[m], H[i]] = [H[i], H[m]]; i = m; } } return t; };
+  const pop = () => { const t = H[0], l = H.pop(); if (H.length) { H[0] = l; let i = 0; for (;;) { const a = 2 * i + 1, c = a + 1; let mm = i; if (a < H.length && H[a].s > H[mm].s) mm = a; if (c < H.length && H[c].s > H[mm].s) mm = c; if (mm === i) break; [H[mm], H[i]] = [H[i], H[mm]]; i = mm; } } return t; };
   const k0 = start.join(), seen = new Map([[k0, null]]); push({ b: start, s: score(start), k: k0 });
   const t0 = performance.now(); let nodes = 0;
   while (H.length) {
@@ -117,23 +150,98 @@ function solveSearch(start, m, maxNodes, maxMs) {
   return { none: true, nodes };
 }
 
+/* ---------- game state (the same object is what gets sent to your partner) ---------- */
+function fresh(per, first) {
+  return { gameId: "g" + uid(), v: 0, ts: 0, by: null, per, first, turn: first, over: false, winner: null, moves: 0,
+    sides: [0, 1].map(() => ({ b: Array(L).fill(per), m: rnd(L) })), last: null };
+}
+function normalize(s) {
+  if (!s || !Array.isArray(s.sides) || s.sides.length !== 2 || !s.sides.every((x) => x && Array.isArray(x.b) && x.b.length === L)) return null;
+  return s;
+}
+const clone = (o) => JSON.parse(JSON.stringify(o));
+function applyMove(s, k, i) {                // returns { n: new state, r: simulation result }
+  const n = clone(s), tot = L * s.per;
+  const r = simulate(n.sides[k].b, i, tot, n.sides[k].m);
+  n.sides[k].b = r.b; n.moves++; n.last = { id: uid(), k, i };
+  if (r.win) { n.over = true; n.winner = k; } else n.turn = 1 - k;
+  return { n, r };
+}
+const saved = { online: null, local: null };
+let state = (mode === "online" ? normalize(loadJSON("ym.state")) : null) || fresh(4, mode === "online" ? 0 : 1);
+function loadJSON(k) { try { return JSON.parse(store(k) || "null"); } catch (e) { return null; } }
+let shownB = state.sides.map((x) => x.b.slice());   // the boards as drawn (they lag behind `state` while a move animates)
+let busy = false, solving = false, stopAuto = false, solutions = null, pending = null, animSeen = state.last ? state.last.id : null;
+
+/* ---------- transport (online) ---------- */
+const myCid = uid();
+let clients = [], connected = 0, everConnected = false;
+const lastSeen = [0, 0];
+function newer(a, b) { if (!b) return true; if ((a.v || 0) !== (b.v || 0)) return (a.v || 0) > (b.v || 0); if ((a.ts || 0) !== (b.ts || 0)) return (a.ts || 0) > (b.ts || 0); return String(a.by || "") > String(b.by || ""); }
+function publish(sub, obj, retain, qos) { const p = JSON.stringify(obj); clients.forEach((c) => { try { c.publish(BASE + sub, p, { qos: qos == null ? 1 : qos, retain: !!retain }); } catch (e) {} }); }
+let repubT = null;
+function republishSoon() { clearTimeout(repubT); repubT = setTimeout(() => { if (state.v > 0) publish("state", state, true, 1); }, 400 + Math.random() * 900); }
+function commit(n) {                          // adopt + broadcast a state made on this phone
+  if (mode === "online") { n.v = (state.v || 0) + 1; n.ts = Date.now(); n.by = SEATS[meIdx]; store("ym.state", JSON.stringify(n)); }
+  state = n;
+  if (mode === "online") publish("state", state, true, 1);
+}
+function onMessage(topic, buf, packet) {
+  if (mode !== "online") return;
+  const sub = topic.slice(BASE.length); let d;
+  try { d = JSON.parse(buf.toString()); } catch (e) { return; }
+  if (!d || typeof d !== "object") return;
+  if (sub === "state") {
+    d = normalize(d);
+    if (!d) return;
+    if (newer(d, state)) adopt(d, !packet.retain);
+    else if (state.v > 0 && newer(state, d)) republishSoon();
+  } else if (sub === "hb" || sub === "hello") {
+    const k = SEATS.indexOf(d.who);
+    if (k >= 0 && d.cid !== myCid) {
+      if (!packet.retain) lastSeen[k] = Date.now();
+      if (typeof d.v === "number" && d.v < state.v) republishSoon();
+      if (sub === "hello") heartbeat();
+      paint(-1, -1);
+    }
+  }
+}
+function connect() {
+  if (!COUPLE || typeof mqtt === "undefined") return;
+  BROKERS.forEach((url, i) => {
+    let c; try { c = mqtt.connect(url, { clientId: "ym_" + myCid + "_" + i, clean: true, reconnectPeriod: 4000, connectTimeout: 10000, keepalive: 30, protocolVersion: 4 }); } catch (e) { return; }
+    c._up = false;
+    c.on("connect", () => { c._up = true; everConnected = true; recount();
+      c.subscribe(BASE + "#", { qos: 1 }, () => { c.publish(BASE + "hello", JSON.stringify({ who: SEATS[meIdx], cid: myCid, v: state.v }), { qos: 0 });
+        setTimeout(() => { if (c._up && state.v > 0 && mode === "online") c.publish(BASE + "state", JSON.stringify(state), { qos: 1, retain: true }); }, 2500); }); });
+    c.on("close", () => { c._up = false; recount(); }); c.on("offline", () => { c._up = false; recount(); }); c.on("error", () => {});
+    c.on("message", onMessage);
+    clients.push(c);
+  });
+}
+function recount() { const n = clients.filter((c) => c._up).length; if (n !== connected) { connected = n; netNote(); } }
+function heartbeat() { if (COUPLE) publish("hb", { who: SEATS[meIdx], cid: myCid, v: state.v }, false, 0); }
+setInterval(() => { if (mode === "online") { heartbeat(); netNote(); } }, 12000);
+
 /* ---------- drawing ---------- */
-const els = [[], []];                    // els[side][i] = { btn, balls, num }
+const els = [[], []];                    // els[k][i] = { btn, n }
+const vpos = (k) => (k === bottomIdx() ? 1 : 0);
 function build() {
   const stone = $("stone"); stone.innerHTML = ""; els[0] = []; els[1] = [];
-  const mk = (side) => {
+  const mk = (v) => {
+    const k = v === 1 ? bottomIdx() : 1 - bottomIdx();
     const wrap = document.createElement("div");
-    const tag = document.createElement("div"); tag.className = "tag"; tag.innerHTML = "<span>" + NAME[side] + "</span><span id='st" + side + "'></span>";
+    const tag = document.createElement("div"); tag.className = "tag"; tag.innerHTML = "<span id='nm" + k + "'></span><span id='st" + k + "'></span>";
     const g = document.createElement("div"); g.className = "grid";
     const cells = Array(8).fill(null);
-    for (let i = 0; i < L; i++) { const { r, c } = cell(side, i); cells[(r - side * 2) * 4 + c] = i; }
+    for (let i = 0; i < L; i++) { const { r, c } = cell(v, i); cells[(r - v * 2) * 4 + c] = i; }
     for (const i of cells) {
       const b = document.createElement("button"); b.type = "button"; b.className = "hole";
       b.innerHTML = '<span class="idx">' + (i + 1) + '</span>';
-      b.addEventListener("click", () => play(side, i));
-      g.appendChild(b); els[side][i] = { btn: b, n: -1 };
+      b.addEventListener("click", () => play(k, i));
+      g.appendChild(b); els[k][i] = { btn: b, n: -1 };
     }
-    if (side === 0) { wrap.appendChild(tag); wrap.appendChild(g); } else { wrap.appendChild(g); wrap.appendChild(tag); tag.style.margin = "6px 2px 0"; }
+    if (v === 0) { wrap.appendChild(tag); wrap.appendChild(g); } else { wrap.appendChild(g); wrap.appendChild(tag); tag.style.margin = "6px 2px 0"; }
     return wrap;
   };
   const d = document.createElement("div"); d.className = "line"; d.setAttribute("aria-hidden", "true");
@@ -144,10 +252,10 @@ function drawBalls(e, n) {
   e.btn.querySelectorAll(".ball").forEach((x) => x.remove());
   const shown = Math.min(n, 60);
   const size = shown <= 4 ? 24 : shown <= 9 ? 19 : shown <= 20 ? 14 : shown <= 36 ? 11 : 9;   // % of the hole
-  const R = 40;                                                                              // % radius available
+  const R = 40;
   for (let k = 0; k < shown; k++) {
     let x = 50, y = 50;
-    if (shown > 1) {                                  // sunflower layout inside the hole
+    if (shown > 1) {
       const rr = R * Math.sqrt((k + 0.5) / shown) * (shown <= 4 ? 0.62 : 0.9), a = k * 2.399963 + 0.6;
       x = 50 + rr * Math.cos(a); y = 50 + rr * Math.sin(a);
     }
@@ -156,97 +264,147 @@ function drawBalls(e, n) {
     e.btn.appendChild(b);
   }
 }
-function paint(activeSide, active) {
-  for (let s = 0; s < 2; s++) {
-    const S = sides[s];
+const canTap = (k) => !busy && !solving && !state.over && state.turn === k && (mode === "local" || (COUPLE && k === meIdx));
+function paint(activeK, active) {
+  for (let k = 0; k < 2; k++) {
     for (let i = 0; i < L; i++) {
-      const e = els[s][i];
-      drawBalls(e, S.b[i]);
-      e.btn.classList.toggle("active", s === activeSide && i === active);
-      e.btn.classList.toggle("done", S.done && S.b[i] > 0);
-      e.btn.classList.toggle("master", i === S.m);
-      e.btn.disabled = busy || solving || over || s !== turn || S.b[i] === 0;
+      const e = els[k][i]; if (!e) continue;
+      drawBalls(e, shownB[k][i]);
+      e.btn.classList.toggle("active", k === activeK && i === active);
+      e.btn.classList.toggle("done", state.over && state.winner === k && shownB[k][i] > 0 && !busy);
+      e.btn.classList.toggle("master", i === state.sides[k].m);
+      e.btn.disabled = !canTap(k) || shownB[k][i] === 0;
       e.btn.classList.remove("hint");
-      e.btn.setAttribute("aria-label", NAME[s] + " hole " + (i + 1) + ", " + S.b[i] + " balls" + (i === S.m ? ", master hole" : ""));
+      e.btn.setAttribute("aria-label", nameOf(k) + " hole " + (i + 1) + ", " + shownB[k][i] + " balls" + (i === state.sides[k].m ? ", master hole" : ""));
     }
-    $("st" + s).textContent = S.done ? "✓ WINNER" : (!over && s === turn ? "▶ YOUR TURN" : "");
+    const nm = $("nm" + k), st = $("st" + k);
+    if (nm) nm.textContent = mode === "online" && COUPLE ? (k === meIdx ? "You" : COUPLE.slots[SEATS[k]]) + (k === 1 - meIdx && Date.now() - lastSeen[k] < 40000 ? " · online" : "") : nameOf(k);
+    if (st) st.textContent = busy ? "" : state.over ? (state.winner === k ? "✓ WINNER" : "") : state.turn === k ? (mode === "online" ? (k === meIdx ? "▶ YOUR TURN" : "▶ THEIR TURN") : "▶ YOUR TURN") : "";
   }
-  $("moves").textContent = moves;
-}
-function reset(n) {
-  if (n) per = n;
-  stopAuto = true; busy = false; moves = 0; solutions = null; turn = 1; over = false;
-  sides = [0, 1].map(() => ({ b: Array(L).fill(per), done: false, m: Math.floor(Math.random() * L) }));
-  $("out").classList.add("hidden"); $("play").classList.add("hidden");
-  $("status").textContent = "Bottom side starts. Tap a hole.";
+  $("moves").textContent = state.moves;
   document.querySelectorAll("#cfg button").forEach((b) => {
-    const on = +b.dataset.n === per;
+    const on = +b.dataset.n === state.per;
     b.className = "btn px-4 py-1 " + (on ? "bg-black text-yellow-300" : "bg-white");
     b.setAttribute("aria-pressed", on);
   });
+  $("mLocal").setAttribute("aria-pressed", mode === "local"); $("mOnline").setAttribute("aria-pressed", mode === "online");
+}
+function netNote() {
+  const n = $("net"); let t = "";
+  if (mode === "online") {
+    if (!COUPLE) t = "To play online, sign in on the home page and add your partner. <a class='underline font-bold' href='./'>Go to the home page</a>";
+    else if (typeof mqtt === "undefined") t = "The connection code didn't load. Reload the page.";
+    else if (!connected) t = (everConnected ? "Reconnecting…" : "Connecting…") + " Your moves are saved and will reach " + COUPLE.partner + " when you're back online.";
+  }
+  n.innerHTML = t; n.classList.toggle("hidden", !t);
+  $("who").innerHTML = mode === "online" && COUPLE ? "<span class='dot " + (Date.now() - lastSeen[1 - meIdx] < 40000 ? "on" : "") + "'></span>" + COUPLE.partner : "";
   paint(-1, -1);
 }
 
-/* ---------- playing a move ---------- */
-async function play(s, i) {
-  const S = sides[s];
-  if (busy || over || s !== turn || !S.b[i]) return;
-  busy = true; solutions = null; $("play").classList.add("hidden"); $("out").classList.add("hidden"); $("status").textContent = "";
-  const tot = L * per;
-  let hand = S.b[i], p = i; S.b[i] = 0; paint(s, p);
+/* ---------- animation of one move ---------- */
+const say = (t) => { $("status").textContent = t; };
+async function animateMove(oldB, k, i, r, tot, mover) {
+  busy = true; shownB = state.sides.map((x, j) => (j === k ? oldB.slice() : x.b.slice()));
+  const b = shownB[k], m = state.sides[k].m; let hand = b[i], p = i, laps = 0; b[i] = 0; paint(k, p);
+  say("");
   while (true) {
     while (hand > 0) {
       await sleep(DELAY);
-      p = (p + 1) % L; S.b[p]++; hand--;
-      paint(s, p);
-      const bt = els[s][p].btn; bt.classList.remove("drop"); void bt.offsetWidth; bt.classList.add("drop");
+      p = (p + 1) % L; b[p]++; hand--;
+      paint(k, p);
+      const bt = els[k][p].btn; bt.classList.remove("drop"); void bt.offsetWidth; bt.classList.add("drop");
     }
-    if (S.b[p] === tot) {
-      moves++; S.done = true; over = true; busy = false; paint(-1, -1);
-      $("status").textContent = NAME[s] + " wins! All " + tot + " balls are in hole " + (p + 1) + ".";
-      return;
-    }
-    if (p === S.m) {
-      moves++; busy = false; turn = 1 - s; paint(-1, -1);
-      $("status").textContent = "You ended in the red hole, so you can't pick up. " + NAME[turn] + " plays.";
-      return;
-    }
-    if (S.b[p] === 1) {
-      moves++; busy = false; turn = 1 - s; paint(-1, -1);
-      $("status").textContent = "Ended in an empty hole, so the turn passes. " + NAME[turn] + " plays.";
-      return;
-    }
+    if (b[p] === tot || p === m || b[p] === 1 || ++laps > 500) break;
     await sleep(DELAY);
-    $("status").textContent = "Chain! Picking up " + S.b[p] + " from hole " + (p + 1) + "…";
-    hand = S.b[p]; S.b[p] = 0; paint(s, p);
+    say("Chain! Picking up " + b[p] + " from hole " + (p + 1) + "…");
+    hand = b[p]; b[p] = 0; paint(k, p);
+  }
+  shownB = state.sides.map((x) => x.b.slice());          // make sure what's drawn is exactly what the rules say
+  busy = false; paint(-1, -1);
+  const who = shortName(k), next = shortName(state.turn);
+  if (r.win) say(mode === "online" ? (k === meIdx ? "You win! 🏆" : who + " wins.") + " All " + tot + " balls are in hole " + (r.p + 1) + "." : nameOf(k) + " wins! All " + tot + " balls are in hole " + (r.p + 1) + ".");
+  else if (r.end === "master") say(mode === "online" ? (k === meIdx ? "You ended in the red hole, so you can't pick up. " : who + " ended in the red hole. ") + (state.turn === meIdx ? "Your turn." : next + " plays.") : "You ended in the red hole, so you can't pick up. " + nameOf(state.turn) + " plays.");
+  else say(mode === "online" ? (k === meIdx ? "Ended in an empty hole, so the turn passes. " : who + " ended in an empty hole. ") + (state.turn === meIdx ? "Your turn." : next + " plays.") : "Ended in an empty hole, so the turn passes. " + nameOf(state.turn) + " plays.");
+}
+
+/* ---------- playing and receiving moves ---------- */
+async function play(k, i) {
+  if (!canTap(k) || !state.sides[k].b[i] || busy) return;
+  busy = true; solutions = null; $("play").classList.add("hidden"); $("out").classList.add("hidden");
+  const old = state.sides[k].b.slice(), tot = L * state.per;
+  const { n, r } = applyMove(state, k, i);
+  commit(n); animSeen = n.last.id;
+  await animateMove(old, k, i, r, tot, true);
+  afterMove();
+}
+function adopt(d, live) {                     // a newer state arrived from the other phone
+  if (busy) { pending = d; return; }
+  pending = null;
+  const prev = state;
+  state = d; store("ym.state", JSON.stringify(state));
+  const ok = live && d.last && d.last.id !== animSeen && prev.gameId === d.gameId && d.v === prev.v + 1 && d.last.k !== meIdx;
+  animSeen = d.last ? d.last.id : null;
+  solutions = null; $("play").classList.add("hidden"); $("out").classList.add("hidden");
+  if (ok) {
+    busy = true;
+    const r = simulate(prev.sides[d.last.k].b, d.last.i, L * prev.per, prev.sides[d.last.k].m);
+    animateMove(prev.sides[d.last.k].b, d.last.k, d.last.i, r, L * prev.per, false).then(() => { afterMove(); alertMe(); });
+  } else {
+    shownB = state.sides.map((x) => x.b.slice()); paint(-1, -1);
+    if (live && prev.gameId !== d.gameId) { say("New game started."); alertMe(); }
+    else if (!d.last) say("New game. " + (d.turn === meIdx ? "You start." : COUPLE.slots[SEATS[d.turn]] + " starts."));
   }
 }
+function afterMove() { if (pending) { const d = pending; pending = null; adopt(d, false); } else paint(-1, -1); }
+function newGame(per) {
+  if (!state.over && state.moves > 0 && !confirm("Start a new game? The current one will end.")) return;
+  stopAuto = true; solutions = null; $("out").classList.add("hidden"); $("play").classList.add("hidden");
+  const first = state.over ? 1 - (state.winner == null ? 0 : state.winner) : 1 - state.first;
+  const n = fresh(per || state.per, mode === "online" ? (state.first === 0 ? 1 : 0) : 1);
+  commit(n); animSeen = null; shownB = state.sides.map((x) => x.b.slice());
+  say(mode === "online" ? (n.turn === meIdx ? "New game. You start." : "New game. " + COUPLE.slots[SEATS[n.turn]] + " starts.") : "Bottom side starts. Tap a hole.");
+  paint(-1, -1);
+}
+
+/* ---------- alerts for your partner's move ---------- */
+const toastEl = $("toast"); let toastT = null, hiddenNew = 0; const baseTitle = document.title;
+let actx = null, swReg = null;
+function beep() { try { actx = actx || new (window.AudioContext || window.GR_AC || window.webkitAudioContext)(); const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(); o.type = "triangle"; o.frequency.setValueAtTime(660, t); o.frequency.setValueAtTime(880, t + .12); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.2, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + .3); o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + .32); } catch (e) {} }
+function alertMe() {
+  if (mode !== "online" || !COUPLE) return;
+  const t = state.over ? (state.winner === meIdx ? "You won! 🏆" : COUPLE.partner + " won") : state.turn === meIdx ? "Your turn in Tsoro yemakomba" : "";
+  if (!t) return;
+  if (document.hidden) {
+    hiddenNew++; document.title = "(" + hiddenNew + ") " + baseTitle;
+    if ("Notification" in window && Notification.permission === "granted") { const o = { body: COUPLE.partner + " played.", tag: "yemakomba", renotify: true, vibrate: [150, 80, 150], data: { url: location.origin + "/tsoro-yemakomba.html" } }; if (swReg) swReg.showNotification(t, o).catch(() => {}); else { try { new Notification(t, o); } catch (e) {} } }
+  } else { beep(); try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch (e) {} toastEl.textContent = t; toastEl.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove("show"), 3500); }
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { hiddenNew = 0; document.title = baseTitle; if (mode === "online") heartbeat(); } });
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").then((r) => { swReg = r; }).catch(() => {});
 
 /* ---------- solver ---------- */
 $("solve").addEventListener("click", () => {
   if (busy || solving) return;
-  if (over) { $("status").textContent = "The game is over. Press Restart."; return; }
-  solving = true; paint(-1, -1); $("solve").disabled = true; $("status").textContent = "Searching…";
+  if (state.over) { say("The game is over. Start a new one."); return; }
+  solving = true; paint(-1, -1); $("solve").disabled = true; say("Searching…");
   setTimeout(() => {
     const t = performance.now();
-    const res = sides.map((S) => S.done ? { path: [] } : solveSearch(S.b.slice(), S.m, 2500000, 15000));
+    const ks = mode === "online" ? [meIdx] : [0, 1];
+    const res = {}; ks.forEach((k) => { res[k] = solveSearch(state.sides[k].b.slice(), state.sides[k].m, 2500000, 15000); });
     const ms = Math.round(performance.now() - t);
     solving = false; $("solve").disabled = false; paint(-1, -1);
     solutions = res;
     const body = $("outBody"); body.innerHTML = "";
     let ok = true, any = false;
-    res.forEach((r, s) => {
-      const p = document.createElement("p"); p.className = "mt-2";
-      const h = document.createElement("b"); h.textContent = NAME[s] + ": ";
-      p.appendChild(h);
-      if (sides[s].done) p.append("already solved.");
-      else if (r.path) {
+    ks.forEach((k) => {
+      const r = res[k], p = document.createElement("p"); p.className = "mt-2";
+      const h = document.createElement("b"); h.textContent = (mode === "online" ? "Your side" : nameOf(k)) + ": "; p.appendChild(h);
+      if (r.path) {
         any = true;
         p.append(r.path.length + " clicks, in this order (hole numbers as printed on the board). The turn passes to the other player after every click, so these are your clicks only:");
         const o = document.createElement("div"); o.className = "font-mono leading-6 max-h-40 overflow-auto break-words mt-1";
-        let bd = sides[s].b.slice(), tot = L * per;
-        o.textContent = r.path.map((x) => { const q = simulate(bd, x, tot, sides[s].m); bd = q.b; return (x + 1); }).join(" → "); p.appendChild(o);
-        if (r.path.length) els[s][r.path[0]].btn.classList.add("hint");
+        o.textContent = r.path.map((x) => x + 1).join(" → "); p.appendChild(o);
+        if (r.path.length) els[k][r.path[0]].btn.classList.add("hint");
       } else {
         ok = false;
         p.append(r.none ? "no winning sequence exists from this board (every reachable position was searched)."
@@ -256,25 +414,53 @@ $("solve").addEventListener("click", () => {
     });
     $("out").classList.remove("hidden");
     $("play").classList.toggle("hidden", !(ok && any));
-    $("status").textContent = (ok ? "Solved" : "Search finished") + " in " + ms + " ms.";
+    say((ok ? "Solved" : "Search finished") + " in " + ms + " ms.");
   }, 30);
 });
 $("play").addEventListener("click", async () => {
-  if (!solutions || busy) return;
-  stopAuto = false; const plan = solutions.map((r) => (r.path || []).slice());
+  if (!solutions) return;
+  stopAuto = false; const plan = {}; Object.keys(solutions).forEach((k) => { plan[k] = (solutions[k].path || []).slice(); });
   $("play").classList.add("hidden");
-  while (!over && !stopAuto) { const i = plan[turn].shift(); if (i === undefined) break; await play(turn, i); await sleep(150); }
+  const gid = state.gameId;
+  while (!state.over && !stopAuto && state.gameId === gid) {
+    const k = state.turn;
+    if (!plan[k]) { await sleep(400); continue; }           // waiting for the partner
+    if (busy || !canTap(k)) { await sleep(250); continue; }
+    const i = plan[k].shift(); if (i === undefined) break;
+    await play(k, i); await sleep(150);
+  }
 });
-$("reset").addEventListener("click", () => reset());
 
-/* ---------- start ---------- */
+/* ---------- controls ---------- */
+$("reset").addEventListener("click", () => newGame());
+function setMode(m) {
+  if (m === mode) return;
+  if (m === "online" && !COUPLE) { mode = "online"; saved.local = state; state = fresh(4, 0); }
+  else { saved[mode] = state; mode = m; store("ym.mode", m); state = saved[m] || (m === "online" ? (normalize(loadJSON("ym.state")) || fresh(4, 0)) : fresh(4, 1)); }
+  stopAuto = true; solutions = null; pending = null; $("out").classList.add("hidden"); $("play").classList.add("hidden");
+  shownB = state.sides.map((x) => x.b.slice()); animSeen = state.last ? state.last.id : null;
+  build(); netNote(); say(m === "online" ? "Online: you play your side, your partner plays theirs." : "Same phone: take turns on this screen.");
+}
+$("mLocal").addEventListener("click", () => setMode("local"));
+$("mOnline").addEventListener("click", () => setMode("online"));
 [2, 3, 4, 5].forEach((n) => {
   const b = document.createElement("button"); b.type = "button"; b.dataset.n = n; b.textContent = n;
-  b.addEventListener("click", () => reset(n));
+  b.addEventListener("click", () => { if (n !== state.per || state.moves > 0) newGame(n); });
   $("cfg").appendChild(b);
 });
-build(); reset(4);
-window.__sow = { simulate, solveSearch, L, masters: () => sides.map((x) => x.m), state: () => ({ sides: sides.map((s) => s.b), moves, done: sides.map((s) => s.done) }) };
+
+/* ---------- self-update (same as the other games) ---------- */
+const BUILD = "20261025-1135"; let updating = false;
+function reloadWhenSafe(b) { const key = "upd-" + location.pathname + "-" + b; try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch (e) {}
+  const go = () => location.replace(location.pathname + "?v=" + encodeURIComponent(b)); if (!busy) return go(); const t = setInterval(() => { if (!busy) { clearInterval(t); go(); } }, 3000); }
+async function checkUpdate() { if (updating || !/^https?:$/.test(location.protocol)) return; try { const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return; const j = await r.json(); if (j && j.build && j.build !== BUILD) { updating = true; reloadWhenSafe(j.build); } } catch (e) {} }
+setTimeout(checkUpdate, 3000); setInterval(checkUpdate, 60000); document.addEventListener("visibilitychange", () => { if (!document.hidden) checkUpdate(); });
+
+build(); netNote();
+say(mode === "online" && COUPLE ? (state.over ? "Game over. Start a new one." : state.turn === meIdx ? "Your turn." : COUPLE.slots[SEATS[state.turn]] + " plays.") : "Bottom side starts. Tap a hole.");
+connect();
+window.__sow = { simulate, solveSearch, L, applyMove, fresh, state: () => state, setState: (s) => { state = s; shownB = s.sides.map((x) => x.b.slice()); paint(-1, -1); }, play, mode: () => mode };
 </script>
+<script src="presence.js" data-game="yemakomba" data-title="Tsoro yemakomba" data-url="tsoro-yemakomba.html"></script>
 </body>
 </html>
