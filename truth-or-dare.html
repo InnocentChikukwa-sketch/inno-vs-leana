@@ -72,6 +72,24 @@ textarea::placeholder,input::placeholder{color:var(--muted)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{padding:9px 13px;border-radius:999px;background:#ece2d6;color:var(--ink);font-weight:600;font-size:15px}
 .chip[aria-pressed=true]{background:var(--ink);color:var(--card)}
+/* big reaction buttons + the animation that plays on both phones when a reaction is sent */
+.rxgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rx{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:86px;padding:10px 3px;border-radius:18px;background:var(--c);color:#211a24;font-weight:800;border:3px solid transparent;transition:transform .12s,box-shadow .12s}
+.rx:active{transform:scale(.94)}
+.rx-e{font-size:34px;line-height:1}
+.rx-l{font-family:var(--display);font-size:14.5px;line-height:1.1;text-align:center;letter-spacing:-.01em}
+.rx[aria-pressed=true]{border-color:var(--ink);box-shadow:0 4px 0 var(--ink);transform:translateY(-2px) scale(1.04)}
+.rx.pop{animation:rxpop .35s}
+@keyframes rxpop{0%{transform:scale(.8)}60%{transform:scale(1.14)}100%{transform:translateY(-2px) scale(1.04)}}
+.fx{position:fixed;inset:0;pointer-events:none;z-index:90;overflow:hidden}
+.fx i{position:absolute;top:0;left:var(--x);font-style:normal;font-size:var(--s);opacity:0;animation:var(--a) var(--t) var(--d) ease-in forwards}
+@keyframes fall{0%{transform:translateY(-14vh) rotate(0);opacity:1}100%{transform:translateY(112vh) rotate(var(--r));opacity:1}}
+@keyframes rise{0%{transform:translateY(112vh) rotate(0);opacity:1}100%{transform:translateY(-16vh) rotate(var(--r));opacity:0}}
+.fx-stamp{position:absolute;left:50%;top:36%;transform:translate(-50%,-50%) rotate(-7deg);background:var(--c);color:#211a24;border:5px solid #211a24;border-radius:16px;padding:8px 18px;
+  font-family:var(--display);font-weight:800;font-size:clamp(28px,9.5vw,60px);text-transform:uppercase;white-space:nowrap;box-shadow:0 8px 0 rgba(0,0,0,.45);animation:stamp 1.9s forwards}
+@keyframes stamp{0%{transform:translate(-50%,-50%) rotate(-7deg) scale(2.6);opacity:0}14%{transform:translate(-50%,-50%) rotate(-7deg) scale(1);opacity:1}82%{transform:translate(-50%,-50%) rotate(-7deg) scale(1);opacity:1}100%{transform:translate(-50%,-50%) rotate(-7deg) scale(1.05);opacity:0}}
+.app.shake{animation:shake .55s}
+@keyframes shake{10%,90%{transform:translateX(-4px)}20%,80%{transform:translateX(7px)}30%,50%,70%{transform:translateX(-10px)}40%,60%{transform:translateX(10px)}}
 .toggle{display:flex;align-items:center;gap:10px;font-weight:600}
 .toggle input{width:22px;height:22px;accent-color:var(--gold)}
 .wait{display:flex;align-items:center;gap:10px;color:#62556a;font-weight:600}
@@ -325,7 +343,34 @@ const DARES=[
 "Make up a song about me on the spot, at least 4 lines.",
 "Show me your best 'I'm sorry' puppy eyes for 10 seconds without blinking.",
 "Send me your favourite photo of the two of us and say why."];
-const REACTIONS=["Liar!","I'm dead 😂","So cute 🥺","Boring…","Respect","Explain yourself!"];
+const REACTIONS=["Respect","Boring…","Explain yourself!"];   // smaller extra chips under the big buttons
+const BIGRX=[
+  {v:"Liar!",l:"Liar!",e:"🤥",c:"#ffb4a8",fx:"shake",p:["💢","❗","🤥"]},
+  {v:"Objection!",l:"Objection!",e:"⚖️",c:"#f9dc8a",fx:"shake",p:["⚖️","❗","🔨"]},
+  {v:"Cringe",l:"Cringe",e:"😬",c:"#c9e8a0",fx:"shake",p:["😬","🫠","😖"]},
+  {v:"Awww",l:"Awww",e:"🥹",c:"#ffc2da",fx:"hearts",p:["💖","💕","🥹","💗"]},
+  {v:"Marry me",l:"Marry me",e:"💍",c:"#e2c4ff",fx:"hearts",p:["💍","💖","💐","💒"]},
+  {v:"I'm dead 😂",l:"I'm dead",e:"😂",c:"#a9dcff",fx:"confetti",p:["😂","🤣","💀","🎉"]}];
+const EXTRA_FX={"Respect":{e:"🫡",fx:"confetti",p:["🎉","✨","🫡"]},"Explain yourself!":{e:"🧐",fx:"shake",p:["🧐","❓"]},"Boring…":{e:"🥱",fx:"shake",p:["🥱","💤"]},"So cute 🥺":{e:"🥺",fx:"hearts",p:["💖","🥺"]}};
+const rxInfo=v=>BIGRX.find(x=>x.v===v)||(EXTRA_FX[v]?Object.assign({v,l:v,c:"#f2c14e"},EXTRA_FX[v]):null);
+// Stamp + hearts/confetti/shake for a reaction. Plays on both phones when the round is sent; skipped for people who ask for less motion.
+function playFx(v){
+  const x=rxInfo(v); if(!x) return;
+  try{ if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches) return; }catch(e){}
+  const old=document.querySelector(".fx"); if(old) old.remove();
+  const box=document.createElement("div"); box.className="fx"; box.setAttribute("aria-hidden","true");
+  const st=document.createElement("div"); st.className="fx-stamp"; st.style.setProperty("--c",x.c); st.textContent=x.e+" "+x.l; box.appendChild(st);
+  const anim=x.fx==="hearts"?"rise":"fall", n=x.fx==="shake"?14:30;
+  for(let i=0;i<n;i++){
+    const el=document.createElement("i"); el.textContent=x.p[i%x.p.length];
+    el.style.cssText=`--x:${Math.round(Math.random()*92)}%;--s:${18+Math.round(Math.random()*22)}px;--d:${(Math.random()*.7).toFixed(2)}s;--t:${(1.6+Math.random()*1.2).toFixed(2)}s;--r:${Math.round(Math.random()*720-360)}deg;--a:${anim}`;
+    box.appendChild(el);
+  }
+  document.body.appendChild(box); setTimeout(()=>box.remove(),3600);
+  if(x.fx==="shake"){ const a=document.querySelector(".app"); if(a){ a.classList.remove("shake"); void a.offsetWidth; a.classList.add("shake"); setTimeout(()=>a.classList.remove("shake"),600); } }
+  try{ if(navigator.vibrate) navigator.vibrate(x.fx==="shake"?[60,40,60]:[40]); }catch(e){}
+}
+let fxReady=false, lastFxRound=0;   // play a reaction once per finished round, never again on reload
 
 const app=document.getElementById("app");
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -552,7 +597,10 @@ setInterval(()=>{ heartbeat(); render(); },15000);
 function online(p){ return p===me || Date.now()-lastSeen[p]<40000; }
 function partnerTyping(){ const o=other(me); return typingUntil[o]>Date.now(); }
 
-function render(){ { const bw=document.getElementById("barWho"); if(bw) bw.textContent=me?("You're "+NAMES[me]):""; } 
+function render(){
+  if(!fxReady){ fxReady=true; lastFxRound=state.last?state.last.round:0; }
+  else if(state.last&&state.last.round!==lastFxRound){ lastFxRound=state.last.round; if(state.last.reaction&&now()-state.last.ts<30000) playFx(state.last.reaction); }
+  { const bw=document.getElementById("barWho"); if(bw) bw.textContent=me?("You're "+NAMES[me]):""; } 
   const ae=document.activeElement, fid=ae&&ae.id, sel=fid&&ae.selectionStart!=null?[ae.selectionStart,ae.selectionEnd]:null;
   const key=state.gameId+"|"+state.round+"|"+state.phase;
   const cb=document.getElementById("chatbox"); if(cb) draft.chatbox=cb.value;
@@ -649,6 +697,7 @@ function gameView(s){
       const r=draft._react||"";
       body=`<div class="card ${s.choice}"><span class="pill ${s.choice}">${esc(NAMES[ans])} answered</span>
         <p class="sub">${esc(s.question)}</p><div class="answer">${esc(said)}</div>
+        <div class="rxgrid">${BIGRX.map(x=>`<button class="rx" style="--c:${x.c}" data-act="rx" data-v="${esc(x.v)}" aria-pressed="${r===x.v}"><span class="rx-e" aria-hidden="true">${x.e}</span><span class="rx-l">${esc(x.l)}</span></button>`).join("")}</div>
         <div class="chips">${REACTIONS.map(x=>`<button class="chip" data-act="rx" data-v="${esc(x)}" aria-pressed="${r===x}">${esc(x)}</button>`).join("")}</div>
         <input type="text" id="cbox" aria-label="Comment" placeholder="Add a comment (optional)">
         ${s.chicken?"":`<label class="toggle"><input type="checkbox" id="bonus" ${draft._bonus?"checked":""} data-act="bonus"> Give a +1 bonus point</label>`}
@@ -754,7 +803,7 @@ app.addEventListener("click",e=>{
   if(act==="notif"){ try{ Notification.requestPermission().then(()=>{ render(); if(Notification.permission==="granted") toast("Notifications on","You'll get a pop-up even when the game is in the background.",null,"🔔"); }); }catch(e){} return; }
   if(act==="notifno"){ store("tod.nonotif","1"); render(); return; }
   if(act==="bonus"){ draft._bonus=b.checked; return; }
-  if(act==="rx"){ draft._react = draft._react===v ? "" : v; render(); return; }
+  if(act==="rx"){ draft._react = draft._react===v ? "" : v; render(); const pb=document.querySelector(".rx[aria-pressed=true]"); if(pb){ pb.classList.add("pop"); try{ if(navigator.vibrate) navigator.vibrate(20); }catch(e){} } return; }
   if(act==="shuffle"){ const el=document.getElementById("qbox"); const q=freshQ(state.choice==="truth"?TRUTHS:DARES); draft.qbox=q; if(el) el.value=q; return; }
   if(act==="end"){ confirmEnd=true; render(); return; }
   if(act==="endno"){ confirmEnd=false; render(); return; }
